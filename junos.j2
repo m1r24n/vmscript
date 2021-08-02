@@ -1,0 +1,73 @@
+interfaces {
+    {% for intf in interfaces -%}
+    {{ intf }} {
+
+        {% if interfaces[intf].mtu -%}
+        mtu {{ interfaces[intf].mtu }};
+        {% endif -%}
+
+        unit 0 {
+        {% if interfaces[intf].inet -%}
+            family inet {
+                address {{interfaces[intf].inet}};
+            }
+        {% endif -%}
+
+        {% if interfaces[intf].inet6 -%}
+            family inet6 {
+                address {{interfaces[intf].inet6}};
+            }
+        {% endif -%}
+
+        {% if interfaces[intf].mpls -%}
+            family mpls;
+        {% endif -%}
+
+        {% if interfaces[intf].iso -%}
+            {% if intf == "lo0" -%}
+            family iso {
+                address {{interfaces[intf].iso}};
+            }
+            {% else -%}
+            family iso;
+            {% endif -%}
+        {% endif -%}
+        }
+    }
+    {% endfor -%}
+}
+protocols { 
+	{% if protocols -%}
+
+	{% for prot in protocols -%}
+
+	{{prot}} {
+
+		{% if protocols[prot] -%}
+
+            {% for intf in protocols[prot] -%}
+
+                {% if prot == 'lldp' -%}
+                    interface  {{intf}};
+                {% elif prot == 'isis' -%}
+                    {% if protocols[prot][intf] -%}
+                        interface  {{intf}}.0 {
+                            {{ protocols[prot][intf] }};
+                        }
+                    {% else -%}
+                        interface  {{intf}}.0;
+                    {% endif -%}
+                
+                {% else %}
+                    interface {{intf}}.0;
+                {% endif -%}
+
+            {% endfor -%}
+
+		{% endif -%}
+	}
+
+	{% endfor -%}
+
+	{% endif -%}
+}

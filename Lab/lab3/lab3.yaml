@@ -1,0 +1,138 @@
+lab_name: lab3
+files:
+  vmx:
+    dir: vmx
+    re_file: junos-vmx-x86-64-21.1R1.11.qcow2
+    pfe_file: vFPC-20210211.img
+  vqfx:
+    dir: vqfx
+    re_file: jinstall-vqfx-10-f-20.4R2-S1.4.img
+    pfe_file: vqfx-20.2R1-2019010209-pfe-qemu.qcow
+mgmt:
+   intf: lan100
+   ip: 10.1.100.1/24
+exist_bridge:
+  - lan100
+  - lan1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+pcc_server: 172.16.1.11
+nodes:
+  r1:
+    type: vmx
+    mgmt: 
+      ip: 10.1.100.151/24
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.1/32
+          iso: 49.0001.1720.1625.5001.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: r1lan0
+        family:
+          inet: 172.16.1.1/24
+          iso:
+        protocol:
+          isis: passive
+      ge-0/0/1:
+        bridge: wan1
+      ge-0/0/2:
+        bridge: wan2
+      ge-0/0/3: 
+        bridge: wan3
+      ge-0/0/4: 
+        bridge: wan4
+      ae0:
+        family:
+          iso:
+          inet: 172.16.255.128/31
+        aggr: 
+          - ge-0/0/1
+          - ge-0/0/2
+        protocol:
+          isis: ptp
+          lldp:
+      ae1:
+        family:
+          iso:
+          inet: 172.16.255.130/31
+        aggr: 
+          - ge-0/0/3
+          - ge-0/0/4
+        protocol:
+          isis: ptp
+          lldp:
+
+  r2:
+    type: vmx
+    mgmt: 
+      ip: 10.1.100.152/24
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.2/32
+          iso: 49.0001.1720.1625.5002.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: r2lan0
+      ge-0/0/1:
+        bridge: r2lan1
+      ge-0/0/2:
+        bridge: wan1
+      ge-0/0/3:
+        bridge: wan2
+      ae0:
+        family:
+          iso:
+          inet: 172.16.255.129/31
+        aggr: 
+          - ge-0/0/2
+          - ge-0/0/3
+        protocol:
+          isis: ptp
+          lldp:
+      ae1:
+        family:
+          inet: 172.16.2.1/24
+          iso:
+        protocol:
+          isis: passive
+  sw1:
+    type: vqfx
+    mgmt: 
+      ip: 10.1.100.153/24
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.3/32
+          iso: 49.0001.1720.1625.5003.00
+        protocol:
+          isis: passive
+      xe-0/0/0:
+        bridge: sw1lan0
+      xe-0/0/1:
+        bridge: sw1lan1
+      xe-0/0/2:
+        bridge: wan3
+      xe-0/0/3:
+        bridge: wan4
+      ae0:
+        family:
+          iso:
+          inet: 172.16.255.131/31
+        aggr: 
+          - ge-0/0/1
+          - ge-0/0/2
+        protocol:
+          isis: ptp
+          lldp:
+  
+
+  

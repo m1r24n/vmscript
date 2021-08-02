@@ -1,0 +1,157 @@
+lab_name: dc2
+files:
+  vqfx:
+    dir: vqfx
+    re_file : jinstall-vqfx-10-f-18.4R2-S2.3.img
+    pfe_file : vqfx-20.2R1-2019010209-pfe-qemu.qcow
+  vmx:
+    dir: vmx
+    re_file: junos-vmx-x86-64-21.1R1.11.qcow2
+    pfe_file: vFPC-20210211.img
+mgmt:
+   intf : lan100
+   ip : 10.1.100.1/24
+exist_bridge:
+  - lan100
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+nodes:
+  r1:
+    type: vmx
+    mgmt: 
+      ip: 10.1.100.100/24
+    interfaces:
+      ge-0/0/0:
+        bridge: lan1
+      ge-0/0/1: 
+        bridge: l4p2
+  spine1:
+    type: vqfx
+    mgmt: 
+      ip: 10.1.100.101/24
+    interfaces:
+      xe-0/0/0: 
+        bridge: s1l1
+        description: To Leaf1
+      xe-0/0/1: 
+        bridge: s1l2
+        description: To Leaf2
+      xe-0/0/2: 
+        bridge: s1l3
+        description: To Leaf3
+      xe-0/0/3: 
+        bridge: s1l4
+        description: To Leaf4
+  spine2:
+    type: vqfx
+    mgmt: 
+      ip: 10.1.100.102/24
+    interfaces:
+      xe-0/0/0: 
+        bridge: s2l1
+        description: To Leaf1
+      xe-0/0/1: 
+        bridge: s2l2
+        description: To Leaf2
+      xe-0/0/2: 
+        bridge: s2l3
+        description: To Leaf3
+      xe-0/0/3: 
+        bridge: s2l4
+        description: to Leaf4
+  leaf1:
+    type: vqfx
+    mgmt: 
+      ip: 10.1.100.103/24
+    interfaces:
+      xe-0/0/0: 
+        bridge: s1l1
+        description: To Spine1
+      xe-0/0/1: 
+        bridge: s2l1
+        description: To Spine2
+      xe-0/0/2: 
+        bridge: l1p2
+      xe-0/0/3: 
+        bridge: l1p3
+      xe-0/0/4: 
+        bridge: l1p4
+      xe-0/0/5: 
+        bridge: l1p5
+      xe-0/0/6: 
+        bridge: l1p6
+      xe-0/0/7: 
+        bridge: l1p7
+  leaf2:
+    type: vqfx
+    mgmt: 
+      ip: 10.1.100.104/24
+    interfaces:
+      xe-0/0/0: 
+        bridge: s1l2
+        description: To Spine1
+      xe-0/0/1: 
+        bridge: s2l2
+        description: To Spine2
+      xe-0/0/2: 
+        bridge: l2p2
+      xe-0/0/3: 
+        bridge: l2p3
+      xe-0/0/4: 
+        bridge: l2p4
+      xe-0/0/5: 
+        bridge: l2p5
+      xe-0/0/6: 
+        bridge: l2p6   
+      xe-0/0/7: 
+        bridge: l2p7
+  leaf3:
+    type: vqfx
+    mgmt: 
+      ip: 10.1.100.105/24
+    interfaces:
+      xe-0/0/0: 
+        bridge: s1l3
+        description: To Spine1
+      xe-0/0/1: 
+        bridge: s2l3
+        description: To Spine2
+      xe-0/0/2: 
+        bridge: l3p2
+      xe-0/0/3: 
+        bridge: l3p3
+      xe-0/0/4: 
+        bridge: l3p4
+      xe-0/0/5: 
+        bridge: l3p5
+      xe-0/0/6: 
+        bridge: l3p6
+      xe-0/0/7: 
+        bridge: l3p7
+  leaf4:
+    type: vqfx
+    mgmt: 
+      ip: 10.1.100.106/24
+    interfaces:
+      xe-0/0/0: 
+        bridge: s1l4
+        description: To Spine1
+      xe-0/0/1: 
+        bridge: s2l4
+        description: To Spine2
+      xe-0/0/2: 
+        bridge: l4p2
+      xe-0/0/3: 
+        bridge: l4p3
+      xe-0/0/4: 
+        bridge: l4p4
+      xe-0/0/5: 
+        bridge: l4p5
+      xe-0/0/6: 
+        bridge: l4p6
+      xe-0/0/7: 
+        bridge: l4p7

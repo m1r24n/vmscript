@@ -1,0 +1,38 @@
+lab_name: dcgw
+files:
+  vmx:
+    dir: vmx
+    re_file: junos-vmx-x86-64-21.2R1.10.qcow2
+    pfe_file: vFPC-20210520.img
+    nested: vmx-nested-21.1R1.11.qcow2
+mgmt:
+   intf : lan100
+   ip : 10.1.100.1/24
+exist_bridge:
+  - lan100
+  - lan1
+  - br1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+nodes:
+  dcgw:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.81/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.10.241/32
+      ge-0/0/0:
+        bridge: br1
+        mtu: 9000
+        family:
+          inet: 172.16.10.18/28
+      ge-0/0/1:
+        bridge: lan1
+        family:
+          inet: 10.1.1.81/24

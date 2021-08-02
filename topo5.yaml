@@ -1,0 +1,88 @@
+lab_name: topo5
+files:
+   vmx:
+     re_file : junos-vmx-x86-64-19.2R1.8.qcow2 
+     pfe_file : vFPC-20190604.img
+   vqfx:
+     re_file : jinstall-vqfx-10-f-18.4R1.8-hacked.qcow2
+     pfe_file : cosim-18.4R1.8_20180212.qcow2
+   vsrx:
+     re_file : junos-vsrx3-x86-64-19.2R1.8.qcow2
+   vrr:
+     re_file : junos-x86-64-19.2R1.8.img
+mgmt:
+   intf : mgmt0
+   ip : 10.1.101.254/24
+exist_bridge:
+  - lan1
+  - lan2
+dnsmasq:
+  low : 10.1.101.1
+  high: 10.1.101.100
+  protocol: tftp
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+  ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCp+XRPXM1GeKBOumK67UwrxjKT6bNf9rgkoXxdARyVpB4vjD2vyPvBeBhQy1JLbRDotaOyDTJsF3WAIaLka5YHM0dGSfeVtuTAZTDXZipsdCKYE6RqAN3A8KjOYfJKGV3CwjcEBUxi2QqtnNhg1TR5oXAWPjN5XsKjoRMZ7Lwgh0YN0SMb0rEBa82hEUOq2kiEHcW33n1e5vk9DpKD+RSP+6TMuBX8lGj8wCao7650w8wPq+SNfZ7lhc+RIm5e/YvZwbJw+ju9mhSIk8a5+HXhRrRF1IlJotrG/1oOQ2YCDhjSu3qULDTiaHpEwV+ZlYY5MiJPdAqFGQxaUCACjO2p irzan@home2 
+image_source : /disk2/junos_image/source
+image_destination : /disk2/libvirt
+nodes:
+  r1:
+    type : vmx
+    fxp0 : 
+      ip : 10.1.101.1/24
+      mac : 52:54:00:be:ef:01
+    interfaces:
+      ge-0/0/0 : R1Fw1
+      ge-0/0/1 : R1Vqfx1
+      ge-0/0/2 : R1Vqfx2
+      ge-0/0/3 : lanR1
+  r2:
+    type : vmx
+    fxp0 : 
+      ip : 10.1.101.2/24
+      mac : 52:54:00:be:ef:02
+    interfaces:
+      ge-0/0/0 : R2Fw1
+      ge-0/0/1 : R2Vqfx1
+      ge-0/0/2 : R2Vqfx2
+      ge-0/0/3 : lanR2
+  vrr1:
+    type : vrr
+    fxp0 : 
+      ip : 10.1.101.100/24
+      mac : 52:54:00:be:ef:11
+    interfaces:
+      em1 : R1Vqfx1
+  vqfx1:
+    type : vqfx
+    fxp0 : 
+      ip : 10.1.101.3/24
+      mac : 52:54:00:be:ef:03
+    interfaces:
+      xe-0/0/0 : R1Vqfx1
+      xe-0/0/1 : R2Vqfx1 
+      xe-0/0/2 : Vqfx1lan0
+      xe-0/0/3 : Vqfx1lan2
+      xe-0/0/4 : Vqfx1lan3
+  vqfx2:
+    type : vqfx
+    fxp0 : 
+      ip : 10.1.101.4/24
+      mac : 52:54:00:be:ef:04
+    interfaces:
+      xe-0/0/0 : R1Vqfx2
+      xe-0/0/1 : R2Vqfx2 
+      xe-0/0/2 : Vqfx2lan0
+      xe-0/0/3 : Vqfx2lan2
+      xe-0/0/4 : Vqfx2lan3
+  fw1:
+    type : vsrx
+    fxp0 : 
+      ip : 10.1.101.5/24
+      mac : 52:54:00:be:ef:05
+    interfaces:
+      xe-0/0/0 : lan1
+      xe-0/0/1 : R1Fw1
+      xe-0/0/2 : R2Fw1

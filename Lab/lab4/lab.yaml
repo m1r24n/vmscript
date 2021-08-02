@@ -1,0 +1,98 @@
+lab_name: L5
+files:
+  vmx:
+    dir: vmx
+    re_file: junos-vmx-x86-64-21.2R1.10.qcow2
+    pfe_file: vFPC-20210520.img
+mgmt:
+   intf : lan100
+   ip : 10.1.100.1/24
+exist_bridge:
+  - lan100
+  - lan1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+ns:
+  ip: 10.1.100.79
+  port: 3000
+fabric:
+  subnet: 10.100.1.128/25
+  topology:
+    - [ 0x7d, r1, ge-0/0/2, r2, ge-0/0/2 ]
+    - [ 0x7d, r1, ge-0/0/3, r2, ge-0/0/3 ]
+    - [ 0x7d, r2, ge-0/0/4, r3, ge-0/0/2 ]
+    - [ 0x7d, r2, ge-0/0/5, r3, ge-0/0/3 ]
+nodes:
+  r1:
+    type: vmx
+    dual_re: True
+    mgmt: 
+      ip: [ 10.1.100.81/24, 10.1.100.82/24]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.1/32
+          iso: 49.0001.0101.0025.5001.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: pe1ge0
+        family:
+          inet: 10.101.1.1/24
+      ge-0/0/1:
+        bridge: lan1
+        family:
+          inet: 10.1.1.81/24
+          iso:
+        protocol:
+          isis: passive
+  r2:
+    type: vmx
+    dual_re: True
+    mgmt: 
+      ip: [ 10.1.100.83/24, 10.1.100.84/24]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.2/32
+          iso: 49.0001.0101.0025.5002.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: pe2ge0
+        family:
+          inet: 10.101.2.1/24
+      ge-0/0/1:
+        bridge: lan1
+        family:
+          inet: 10.1.1.82/24
+          iso:
+        protocol:
+          isis: passive
+  r3:
+    type: vmx
+    dual_re: True
+    mgmt: 
+      ip: [ 10.1.100.85/24, 10.1.100.86/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.3/32
+          iso: 49.0001.0101.0025.5003.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: pe3ge0
+        family:
+          inet: 10.101.3.1/24
+      ge-0/0/1:
+        bridge: lan1
+        family:
+          inet: 10.1.1.83/24
+          iso:
+        protocol:
+          isis: passive

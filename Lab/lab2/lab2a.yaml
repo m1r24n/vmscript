@@ -1,0 +1,201 @@
+lab_name: lab2
+files:
+  vmx:
+    dir: vmx
+    re_file: junos-vmx-x86-64-21.1R1.11.qcow2
+    pfe_file: vFPC-20210211.img
+mgmt:
+   intf: lan100
+   ip: 10.1.100.1/24
+exist_bridge:
+  - lan100
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+pcc_server: 172.16.1.11
+nodes:
+  r1:
+    type: vmx
+    mgmt: 
+      ip: 10.1.100.151/24
+      mac: 52:54:aa:aa:ef:01
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.1/32
+          iso: 49.0001.1720.1625.5001.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: r1lan0
+      ge-0/0/1:
+        bridge: r1lan1
+      ge-0/0/2: 
+        bridge: r1r2a
+        mtu: 9000
+        family:
+          inet: 172.16.255.128/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+      ge-0/0/3: 
+        bridge: r1r2b
+        mtu: 9000
+        family:
+          inet: 172.16.255.130/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+  r2:
+    type: vmx
+    mgmt: 
+      ip: 10.1.100.152/24
+      mac: 52:54:aa:aa:ef:02
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.2/32
+          iso: 49.0001.1720.1625.5002.00
+        protocol:
+          isis: passive
+      ge-0/0/0: 
+        bridge: r1r2a
+        mtu: 9000
+        family:
+          inet: 172.16.255.129/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+      ge-0/0/1: 
+        bridge: r1r2b
+        mtu: 9000
+        family:
+          inet: 172.16.255.131/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+      ge-0/0/2: 
+        bridge: r2r3a
+        mtu: 9000
+        family:
+          inet: 172.16.255.132/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+      ge-0/0/3: 
+        bridge: r2r3b
+        mtu: 9000
+        family:
+          inet: 172.16.255.134/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+  r3:
+    type: vmx
+    mgmt: 
+      ip: 10.1.100.153/24
+      mac: 52:54:aa:aa:ef:03
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.3/32
+          iso: 49.0001.1720.1625.5003.00
+        protocol:
+          isis: passive
+      ge-0/0/0: 
+        bridge: r2r3a
+        mtu: 9000
+        family:
+          inet: 172.16.255.133/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+      ge-0/0/1: 
+        bridge: r2r3b
+        mtu: 9000
+        family:
+          inet: 172.16.255.135/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+      ge-0/0/2: 
+        bridge: r3vbng
+        mtu: 9000
+        family:
+          inet: 172.16.255.136/31
+          iso:
+          mpls: 
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+  vbng:
+    type: vmx
+    mgmt: 
+      ip: 10.1.100.154/24
+      mac: 52:54:aa:aa:ef:04
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.4/32
+          iso: 49.0001.1720.1625.5004.00
+        protocol:
+          isis: passive
+      ge-0/0/0: 
+        bridge: vbnglan0
+      ge-0/0/1: 
+        bridge: vbnglan1
+      ge-0/0/2: 
+        bridge: lan100
+      ge-0/0/3: 
+        bridge: r3vbng
+        mtu: 9000
+        family:
+          inet: 172.16.255.137/31
+          iso:
+          mpls:
+        protocol:
+          lldp:
+          isis: ptp
+          rsvp:
+          ldp:
+      
+  
+
+  

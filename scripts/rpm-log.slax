@@ -1,0 +1,72 @@
+version 1.2;
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0"; import "../import/junos.xsl";
+param $test-owner = event-script-input/trigger-event/attribute-list/attribute[name=="test-owner"]/value;
+param $test-name = event-script-input/trigger-event/attribute-list/attribute[name=="test-name"]/value;
+param $delay-value;
+var $arguments = {
+  <argument> {
+      <name> "test-name";
+      <description> "Name of the RPM test";
+  }
+  <argument> {
+      <name> "test-owner";
+      <description> " Name of the RPM probe owner";
+  }
+  <argument> {
+     <name> "delay-value";
+     <description> "Delay value to send out, used to generate fake data";
+  }
+}
+/* Add embeded event policy to trigger the script */
+var $event-definition = {
+    <event-options> {
+      <policy> {
+        <name> "rpm-log";
+        <events> "ping_test_completed";
+        <events> "ping_test_failed";
+        <then> {
+          <event-script> {
+            <name> "rpm-log.slax";
+            <output-format> "xml";
+          }
+        }
+      }
+    }
+}
+match / {
+  <op-script-results> {
+	/* Load Probe results */
+	var $get-probe-resultsrpc = <get-probe-results> { <owner> $test-owner; <test> $test-name;} 
+	var $probe-results = jcs:invoke($get-probe-resultsrpc);
+	/* Extract data of interest */
+	var $target-address = $probe-results/probe-test-results/target-address;
+	var $probe-type = $probe-results/probe-test-results/probe-type;
+	var $loss-percentage = format-number(number($probe-results/probe-test-results/probe-test-moving-results/probe-test-generic-results/loss-percentage), '#.##');
+	var $jitter = format-number(number($probe-results/probe-test-results/probe-test-moving-results/probe-test-generic-results/probe-test-rtt/probe-summary-results/jitter-delay) div 1000, '#.###');
+	var $avg-delay = {
+	  if ($delay-value) {
+		number($delay-value);
+	  } else {
+		expr format-number(number($probe-results/probe-test-results/probe-test-moving-results/probe-test-generic-results/probe-test-rtt/probe-summary-results/avg-delay) div 1000, '#.##');
+	  }
+	}
+	var $min-delay = {
+	  if ($delay-value) {
+		number($delay-value);
+	  } else {
+		expr format-number(number($probe-results/probe-test-results/probe-test-moving-results/probe-test-generic-results/probe-test-rtt/probe-summary-results/min-delay) div 1000, '#.##');
+	  }
+	}
+	var $max-delay = {
+	  if ($delay-value) {
+		number($delay-value);
+	  } else {
+		expr format-number(number($probe-results/probe-test-results/probe-test-moving-results/probe-test-generic-results/probe-test-rtt/probe-summary-results/max-delay) div 1000, '#.##');
+	  }
+	}
+
+	expr jcs:syslog("daemon.info","RPM_TEST_RESULTS: ","test-owner=",$test-owner," test-name=",$test-name," loss=",$loss-percentage," min-rtt=",$min-delay," max-rtt=",$max-delay," avgerage-rtt=",$avg-delay," jitter=",$jitter);
+  }
+}

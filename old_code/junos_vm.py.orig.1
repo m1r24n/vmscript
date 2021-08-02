@@ -1,0 +1,1182 @@
+#!/usr/bin/env python3
+import sys
+import os
+import pexpect
+import pynetlinux
+import subprocess
+import libvirt
+import libvirt
+import traceback
+import shutil
+
+from jnpr.junos import Device
+from jnpr.junos.utils.config import Config
+from passlib.hash import md5_crypt
+
+# MACHINE_TYPE="pc-i440fx-2.5"
+MACHINE_TYPE="pc"
+
+def print_syntax():
+	print("usage : createvm_ng.py [-c filename] <command> <vm_name>")
+	print("commands are : ")
+	print("  addbr : to add bridge (requires sudo)")
+	print("  delbr : to del bridge (requires sudo)")
+	print("  definevm : to add VM into KVM hypervisor")
+	print("  undefinevm : to remove VM from KVM hypervisor")
+	print("  start : to start junos VM (it must be followed by VM name or all to start ) ")
+	print("  stop : to stop junos VM (it must be followed by VM name or all to stop )")
+
+def check_argv(argv):
+	retval={}
+	# cmd_list=['addbr','delbr','definevm','undefinevm','start','stop']
+	cmd_list=['addbr','delbr','definevm','undefinevm']
+	if len(argv) == 1:
+		print_syntax()
+	elif len(argv) == 2:
+		if 'start' in argv or 'stop' in argv:
+			print("command start/stop requires additional argument")
+			print_syntax()
+		else:
+			if not os.path.isfile("./lab.conf"):
+				print("file lab.conf doesn't exist, please create one or define another file for configuration")
+
+			else:
+				if argv[1] in cmd_list:
+					retval['config_file']="lab.conf"
+					retval['cmd']=argv[1]
+					if argv[1] == 'stop' or argv[1]=='start':
+						print("command start and stop requires additional argument")
+						retval={}
+				else:
+					print("command " + argv[1] + " does not exist")
+					print_syntax()
+	elif len(argv)==3:
+		if 'start' in argv or 'stop' in argv:
+			if argv[1] == 'start' or argv[1] == 'stop':
+				if not os.path.isfile('lab.conf'):
+					print("file lab.conf doesn't exist, please create one")
+				else:
+					retval['config_file']='lab.conf'
+					retval['vm']=argv[2]
+					if 'start' in argv:
+						retval['cmd']='start'
+					if 'stop' in argv:
+						retval['cmd']='stop'
+		else:
+			print("Syntax error")
+			print_syntax()
+	elif len(argv)==4:
+		if 'start' in argv or 'stop' in argv:
+			print("command start/stop requires additional argument")
+			print_syntax()
+		else:
+			if "-c" in argv:
+				index_c = argv.index("-c")
+				if  index_c == (len(argv) - 1):
+					print("syntax error")
+					print_syntax()
+				else:
+					filename1=argv[argv.index("-c") + 1]
+					if not os.path.isfile(filename1):
+						print("file " + filename1 + " doesn't exist, please create one")
+						print_syntax()
+					else:
+						retval['config_file']=filename1
+						cmd_status=False
+						for i in cmd_list:
+							if i in argv:
+								cmd1=argv.index(i)
+								retval['cmd']=i
+								cmd_status=True
+								break
+						if not cmd_status:
+							print("command is not defined")
+							print_syntax()
+							retval={}
+			else:
+				print("Syntax error")
+				print_syntax()
+	elif len(argv)==5:
+		if ('start' in argv) or ('stop' in argv): 
+			if ('start' in argv and argv.index('start')==4) or ('stop' in argv and argv.index('stop') == 4):
+				print("syntax error")
+				print_syntax()
+			elif "-c" not in argv:
+				print("syntax error")
+				print_syntax()
+			else:
+				index_c = argv.index("-c")
+				if index_c == (len(argv) - 1):
+					print("syntax error")
+					print_syntax()
+				else:
+					filename1=argv[argv.index("-c") + 1]
+					if not os.path.isfile(filename1):
+						print("file " + filename1 + " doesn't exist, please create one")
+					else:
+						retval['config_file']=filename1
+						if 'start' in argv:
+							retval['cmd']='start'
+							retval['vm']=argv[argv.index('start') + 1]
+						if 'stop' in argv:
+							retval['cmd']='stop'	
+							retval['vm']=argv[argv.index('stop') + 1]
+		else:
+			print("syntax error")
+			print_syntax()
+		# if lab.conf is not defined dfine
+	else:
+		print("syntax error")
+		print_syntax()
+
+	return retval
+
+def do_bridge(d1,cmd1):
+	mgmt_intf=d1['lab_name']+ "-" +d1['mgmt']['intf']
+	# mgmt_intf=d1['mgmt']['intf']
+	(mgmt_ip,mgmt_netmask)=d1['mgmt']['ip'].split("/")
+	print("management ip ", mgmt_ip)
+	print("management netmask ", mgmt_netmask)
+	lab_name=d1['lab_name']
+	nodes=list(d1['nodes'].keys())
+	if 'exist_bridge' in d1.keys():
+		eb=d1['exist_bridge']
+	else:
+		eb=['']
+#	if 'ovs' in d1.keys():	
+#		ovs=d1['ovs']
+#	else:
+#		ovs=['']
+	bridges=[mgmt_intf]
+	for i in nodes:
+		for j in list(d1['nodes'][i]['interfaces'].values()):
+			if j not in bridges:
+				bridges.append(lab_name + "-" + j)
+	for i in nodes:
+		if d1['nodes'][i]['type'] != 'vsrx':
+			bridges.append(lab_name + "Int" + i)
+	b1 = set(bridges) - set(eb)
+	bridges=list(b1)
+	for i in bridges:
+		if cmd1=='addbr':
+			if not pynetlinux.brctl.findbridge(i.encode('UTF-8')):
+				print("Creating bridge ",i)
+				pynetlinux.brctl.addbr(i)	
+				# intf=pynetlinux.ifconfig.findif(i.encode('UTF-8'),physical=False)
+				intf=pynetlinux.ifconfig.Interface(i.encode('UTF-8'))
+				intf.up()
+				# set /sys/class/net/topo5-Vqfx2lan3/bridge/group_fwd_mask
+				path1="/sys/class/net/" + i + "/bridge/group_fwd_mask"
+				path2="/sys/devices/virtual/net/" + i + "/bridge/multicast_snooping"
+				# arg1="bash -c \"echo 0x4000 > " +  path1 + "\""
+				arg=[]
+				arg.append("echo 0x4000 > " +  path1) 
+				arg.append("echo 0 > " + path2) 
+				for i in arg:
+					# print(i)
+					cmd=["bash", "-c",i]
+					result=subprocess.Popen(cmd)
+			else:
+				print("Bridge ",i," already exist")
+		elif cmd1=='delbr':
+			if pynetlinux.brctl.findbridge(i.encode('UTF-8')):
+				print("Deleting bridge ",i)
+				intf=pynetlinux.ifconfig.Interface(i.encode('UTF-8'))
+				intf.down()
+				pynetlinux.brctl.delbr(i)	
+			else:
+				print("Bridge ",i," does not exist")
+	if cmd1=='addbr':
+		intf=pynetlinux.ifconfig.Interface(mgmt_intf.encode('UTF-8'))
+		intf.set_ip(mgmt_ip)
+		intf.set_netmask(int(mgmt_netmask))
+
+			
+# from old version
+#	for j in ['add','del']:
+#		oFile=open(j + "_bridge.sh","w")
+#		for line in bridges: 
+#			# oFile.write("sudo ovs-vsctl " + j + "-br " + line + '\n')
+#			if line not in ovs:
+#				if j == 'del':
+#					oFile.write("sudo ip link set dev " + line + " down " + '\n')
+#				oFile.write("sudo brctl " + j + "br " + line + '\n')
+#				if j == 'add':
+#					oFile.write("sudo ip link set dev " + line + " up " + '\n')
+#					oFile.write("sudo bash -c \"echo 16384 > /sys/class/net/" + line + "/bridge/group_fwd_mask \"\n")
+#					oFile.write("sudo bash -c \"echo 0 > /sys/devices/virtual/net/" + line + "/bridge/multicast_snooping \"\n")
+#			else:
+#				oFile.write("sudo ovs-vsctl " + j + "-br " + line + '\n')
+#		if j == 'add':
+#			if mgmt_intf not in bridges:
+#				oFile.write("sudo brctl " + j  + "br "  + mgmt_intf + '\n')
+#				oFile.write("sudo ip link set  dev " + mgmt_intf + " up\n")
+#			oFile.write("sudo ip addr add dev " + mgmt_intf + " " + mgmt_ip + '\n')
+#		if j == 'del':
+#			if mgmt_intf not in bridges:
+#				oFile.write("sudo ip link set  dev " + mgmt_intf + " down\n")
+#				oFile.write("sudo brctl " + j  + "br " + mgmt_intf + '\n')
+#		oFile.close()
+#		os.system("chmod +x " + j + "_bridge.sh")
+
+
+def create_vsrx_xml(node,d1): 
+	lab_name = d1['lab_name']
+	re_file = d1['files']['vsrx']['re_file']
+	if 'ovs' in d1.keys():
+		brmode = d1['ovs']
+	else:
+		brmode=['']
+	interfaces = list(d1['nodes'][node]['interfaces'])
+	interfaces.sort()
+	dest_dir=d1['image_destination']
+	mgmt = d1['lab_name'] + "-" + d1['mgmt']['intf']
+	xml = []
+	xml.append("<domain type='kvm'>")
+	xml.append("  <name>" + lab_name + "-" + node + "</name>")
+	xml.append("  <memory unit='KiB'>4194304</memory>")
+	xml.append("  <currentMemory unit='KiB'>4194304</currentMemory>")
+	xml.append("  <vcpu placement='static'>2</vcpu>")
+	xml.append("  <resource>")
+	xml.append("    <partition>/machine</partition>")
+	xml.append("  </resource>")
+	xml.append("  <os>")
+	xml.append("    <type arch='x86_64' machine='"  + MACHINE_TYPE + "'>hvm</type>")
+	xml.append("    <boot dev='hd'/>")
+	xml.append("  </os>")
+	xml.append("  <features>")
+	xml.append("    <acpi/>")
+	xml.append("    <apic/>")
+	xml.append("  </features>")
+	xml.append("  <cpu mode='custom' match='exact'>")
+	xml.append("    <model fallback='allow'>SandyBridge</model>")
+	xml.append("	<feature policy='require' name='pbe'/>")
+	xml.append("    <feature policy='require' name='tm2'/>")
+	xml.append("    <feature policy='require' name='est'/>")
+	xml.append("    <feature policy='require' name='vmx'/>")
+	xml.append("    <feature policy='require' name='osxsave'/>")
+	xml.append("    <feature policy='require' name='ss'/>")
+	xml.append("    <feature policy='require' name='ds'/>")
+	xml.append("    <feature policy='require' name='vme'/>")
+	xml.append("    <feature policy='require' name='dtes64'/>")
+	xml.append("    <feature policy='require' name='monitor'/>")
+	xml.append("    <feature policy='require' name='ht'/>")
+	xml.append("    <feature policy='require' name='pcid'/>")
+	xml.append("    <feature policy='require' name='tm'/>")
+	xml.append("    <feature policy='require' name='pdcm'/>")
+	xml.append("    <feature policy='require' name='pdpe1gb'/>")
+	xml.append("    <feature policy='require' name='ds_cpl'/>")
+	xml.append("    <feature policy='require' name='xtpr'/>")
+	xml.append("    <feature policy='require' name='acpi'/>")
+	xml.append("    <feature policy='disable' name='invtsc'/>")
+	xml.append("  </cpu>")
+	xml.append("  <clock offset='utc'>")
+	xml.append("    <timer name='rtc' tickpolicy='catchup'/>")
+	xml.append("    <timer name='pit' tickpolicy='delay'/>")
+	xml.append("    <timer name='hpet' present='no'/>")
+	xml.append("  </clock>")
+	xml.append("  <on_poweroff>destroy</on_poweroff>")
+	xml.append("  <on_reboot>restart</on_reboot>")
+	xml.append("  <on_crash>restart</on_crash>")
+	xml.append("  <pm>")
+	xml.append("    <suspend-to-mem enabled='no'/>")
+	xml.append("    <suspend-to-disk enabled='no'/>")
+	xml.append("  </pm>")
+	xml.append("  <devices>")
+	xml.append("    <emulator>/usr/bin/kvm-spice</emulator>")
+	xml.append("    <disk type='file' device='disk'>")
+	xml.append("      <driver name='qemu' type='qcow2'/>")
+	xml.append("      <source file='"+ dest_dir + "/" + lab_name + "/" + node + "/" + re_file + "'/>")
+	xml.append("      <target dev='vda' bus='virtio'/>")
+	xml.append("    </disk>")
+	xml.append("    <controller type='pci' index='0' model='pci-root' />")
+	xml.append("    <controller type='ide' index='0' />")
+	xml.append("    <controller type='virtio-serial' index='0' />")
+	xml.append("    <controller type='usb' index='0' model='piix3-uhci' />")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + mgmt + "'/>")
+	# xml.append("       <target dev='" + lab_name + "-" + node + "-fxp0'/>")
+	xml.append("      <model type='virtio'/>")
+	xml.append("      <mac address='" + d1['nodes'][node]['fxp0']['mac'] +"'/>")
+	xml.append("    </interface>")
+	for i in interfaces:
+		xml.append("    <interface type='bridge'>")
+		xml.append("      <source bridge='" + lab_name + "-" + d1['nodes'][node]['interfaces'][i]+ "'/>")
+		if d1['nodes'][node]['interfaces'][i] in brmode:
+			xml.append("      <virtualport type='openvswitch' />")
+		tmp=i.replace('/','.')
+#		xml.append("      <target dev='" + lab_name + "-" + tmp + "-" + node + "'/>")
+		xml.append("      <model type='virtio'/>")
+		xml.append("	  <mtu size='9192'/>")
+		xml.append("    </interface>")
+	xml.append("    <serial type='pty'>")
+	xml.append("      <target port='0'/>")
+	xml.append("    </serial>")
+	xml.append("    <console type='pty'>")
+	xml.append("      <target type='serial' port='0'/>")
+	xml.append("    </console>")
+	xml.append("    <channel type='spicevmc'>")
+	xml.append("      <target type='virtio' name='com.redhat.spice.0' state='disconnected'/>")
+	xml.append("      <address type='virtio-serial' controller='0' bus='0' port='1'/>")
+	xml.append("    </channel>")
+	xml.append("    <input type='mouse' bus='ps2'/>")
+	xml.append("    <input type='keyboard' bus='ps2'/>")
+	xml.append("    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>")
+	xml.append("      <listen type='address' address='0.0.0.0'/>")
+	xml.append("    </graphics>")
+	xml.append("    <video>")
+	xml.append("      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1'/>")
+	xml.append("    </video>")
+	xml.append("    <memballoon model='virtio'>")
+	xml.append("    </memballoon>")
+	xml.append("  </devices>")
+	xml.append("</domain>")
+	# oFile=open(lab_name + "-" + node + ".xml","w")
+	# for line in xml: oFile.write(line + '\n')
+	# oFile.close()
+	return xml
+
+def create_vpfe_vqfx_xml(node,d1): 
+	lab_name = d1['lab_name']
+	pfe_file = d1['files']['vqfx']['pfe_file']
+	if 'ovs' in d1.keys():
+		brmode = d1['ovs']
+	else:
+		brmode=['']
+	dest_dir=d1['image_destination']
+	mgmt = d1['lab_name'] + "-" + d1['mgmt']['intf']
+	xml = []
+	xml.append("<domain type='kvm'>")
+	xml.append("  <name>" + lab_name + "-vpfe-" + node + "</name>")
+	xml.append("  <memory unit='KiB'>1572864</memory>")
+	xml.append("  <currentMemory unit='KiB'>1572864</currentMemory>")
+	xml.append("  <vcpu placement='static'>1</vcpu>")
+	xml.append("  <resource>")
+	xml.append("    <partition>/machine</partition>")
+	xml.append("  </resource>")
+	xml.append("  <os>")
+	xml.append("    <type arch='x86_64' machine='"  + MACHINE_TYPE + "'>hvm</type>")
+	xml.append("    <boot dev='hd'/>")
+	xml.append("  </os>")
+	xml.append("  <features>")
+	xml.append("    <acpi/>")
+	xml.append("    <apic/>")
+	xml.append("  </features>")
+	xml.append("  <cpu mode='custom' match='exact'>")
+	xml.append("    <model fallback='allow'>SandyBridge</model>")
+	xml.append("  </cpu>")
+	xml.append("  <clock offset='utc'>")
+	xml.append("    <timer name='rtc' tickpolicy='catchup'/>")
+	xml.append("    <timer name='pit' tickpolicy='delay'/>")
+	xml.append("    <timer name='hpet' present='no'/>")
+	xml.append("  </clock>")
+	xml.append("  <on_poweroff>destroy</on_poweroff>")
+	xml.append("  <on_reboot>restart</on_reboot>")
+	xml.append("  <on_crash>restart</on_crash>")
+	xml.append("  <pm>")
+	xml.append("    <suspend-to-mem enabled='no'/>")
+	xml.append("    <suspend-to-disk enabled='no'/>")
+	xml.append("  </pm>")
+	xml.append("  <devices>")
+	xml.append("    <emulator>/usr/bin/kvm-spice</emulator>")
+	xml.append("    <disk type='file' device='disk'>")
+	xml.append("      <driver name='qemu' type='qcow2'/>")
+	# xml.append("      <driver name='qemu' type='vmdk'/>")
+	xml.append("      <source file='"+ dest_dir + "/" + lab_name + "/" + node + "/" + pfe_file + "'/>")
+	xml.append("      <backingStore/>")
+	xml.append("      <target dev='hda' bus='ide'/>")
+	xml.append("    </disk>")
+	xml.append("    <controller type='pci' index='0' model='pci-root' />")
+	xml.append("    <controller type='ide' index='0' />")
+	xml.append("    <controller type='virtio-serial' index='0' />")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + mgmt + "'/>")
+	# xml.append("      <target dev='" + lab_name + "-vpfe-" + node + "_em0'/>")
+	xml.append("      <model type='e1000'/>")
+	xml.append("    </interface>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + lab_name + "Int" + node + "'/>")
+	# xml.append("      <target dev='" + lab_name + "-vpfe-" + node + "_em1'/>")
+	xml.append("      <model type='e1000'/>")
+	xml.append("    </interface>")
+	xml.append("    <serial type='pty'>")
+	xml.append("      <target port='0'/>")
+	xml.append("    </serial>")
+	xml.append("    <console type='pty' >")
+	xml.append("      <target type='serial' port='0'/>")
+	xml.append("    </console>")
+	xml.append("    <channel type='spicevmc'>")
+	xml.append("      <target type='virtio' name='com.redhat.spice.0' state='disconnected'/>")
+	xml.append("      <address type='virtio-serial' controller='0' bus='0' port='1'/>")
+	xml.append("    </channel>")
+	xml.append("    <input type='mouse' bus='ps2'/>")
+	xml.append("    <input type='keyboard' bus='ps2'/>")
+	xml.append("    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>")
+	xml.append("      <listen type='address' address='0.0.0.0'/>")
+	xml.append("    </graphics>")
+	xml.append("    <video>")
+	xml.append("      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1'/>")
+	xml.append("    </video>")
+	xml.append("    <memballoon model='virtio'>")
+	xml.append("    </memballoon>")
+	xml.append("  </devices>")
+	xml.append("</domain>")
+	return xml
+	# oFile=open(lab_name + "-vpfe-" + node + ".xml","w")
+	# for line in xml: oFile.write(line + '\n')
+	# oFile.close()
+
+def create_vcp_vqfx_xml(node,d1): 
+	lab_name = d1['lab_name']
+	re_file = d1['files']['vqfx']['re_file']
+	if 'ovs' in d1.keys():
+		brmode = d1['ovs']
+	else:
+		brmode=['']
+	interfaces = list(d1['nodes'][node]['interfaces'])
+	interfaces.sort()
+	dest_dir=d1['image_destination']
+	mgmt = d1['lab_name'] + "-" + d1['mgmt']['intf']
+	xml = []
+	xml.append("<domain type='kvm'>")
+	xml.append("  <name>" + lab_name + "-vcp-" + node + "</name>")
+	xml.append("  <memory unit='KiB'>1048576</memory>")
+	xml.append("  <currentMemory unit='KiB'>1048576</currentMemory>")
+	xml.append("  <vcpu placement='static'>1</vcpu>")
+	xml.append("  <resource>")
+	xml.append("    <partition>/machine</partition>")
+	xml.append("  </resource>")
+	xml.append("  <os>")
+	xml.append("    <type arch='x86_64' machine='"  + MACHINE_TYPE + "'>hvm</type>")
+	xml.append("    <boot dev='hd'/>")
+	xml.append("  </os>")
+	xml.append("  <features>")
+	xml.append("    <acpi/>")
+	xml.append("    <apic/>")
+	xml.append("  </features>")
+	xml.append("  <cpu mode='custom' match='exact'>")
+	xml.append("    <model fallback='allow'>SandyBridge</model>")
+	xml.append("  </cpu>")
+	xml.append("  <clock offset='utc'>")
+	xml.append("    <timer name='rtc' tickpolicy='catchup'/>")
+	xml.append("    <timer name='pit' tickpolicy='delay'/>")
+	xml.append("    <timer name='hpet' present='no'/>")
+	xml.append("  </clock>")
+	xml.append("  <on_poweroff>destroy</on_poweroff>")
+	xml.append("  <on_reboot>restart</on_reboot>")
+	xml.append("  <on_crash>restart</on_crash>")
+	xml.append("  <pm>")
+	xml.append("    <suspend-to-mem enabled='no'/>")
+	xml.append("    <suspend-to-disk enabled='no'/>")
+	xml.append("  </pm>")
+	xml.append("  <devices>")
+	xml.append("    <emulator>/usr/bin/kvm-spice</emulator>")
+	xml.append("    <disk type='file' device='disk'>")
+	# xml.append("      <driver name='qemu' type='vmdk'/>")
+	xml.append("      <driver name='qemu' type='qcow2'/>")
+	xml.append("      <source file='"+ dest_dir + "/" + lab_name + "/" + node + "/" + re_file + "'/>")
+	xml.append("      <backingStore/>")
+	xml.append("      <target dev='hda' bus='ide'/>")
+	xml.append("    </disk>")
+	xml.append("    <controller type='pci' index='0' model='pci-root'>")
+	xml.append("      <alias name='pci.0'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='ide' index='0'>")
+	xml.append("      <alias name='ide'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='virtio-serial' index='0'>")
+	xml.append("      <alias name='virtio-serial0'/>")
+	xml.append("    </controller>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + mgmt + "'/>")
+	# xml.append("      <target dev='" + node + "-re_em0'/>")
+	xml.append("      <model type='e1000'/>")
+	xml.append("      <mac address='" + d1['nodes'][node]['fxp0']['mac'] + "'/>")
+	xml.append("    </interface>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='"+ lab_name + "Int" + node + "'/>")
+	# xml.append("      <target dev='"+ lab_name + "_vcp_" + node + "_em1'/>")
+	xml.append("      <model type='e1000'/>")
+	xml.append("    </interface>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + mgmt + "'/>")
+	# xml.append("      <target dev='" + lab_name + "_vcp_" + node + "_em2'/>")
+	xml.append("      <model type='e1000'/>")
+	xml.append("    </interface>")
+	for i in interfaces:
+		xml.append("    <interface type='bridge'>")
+		xml.append("      <source bridge='" + lab_name + "-" + d1['nodes'][node]['interfaces'][i]+ "'/>")
+		if d1['nodes'][node]['interfaces'][i] in  brmode:
+			xml.append("      <virtualport type='openvswitch' />")
+		tmp=i.replace('/','.')
+		# xml.append("      <target dev='" + lab_name + "-" + tmp + "-" + node + "'/>")
+		xml.append("      <model type='e1000'/>")
+		xml.append("      <mtu size='9192'/>")
+		xml.append("    </interface>")
+	xml.append("    <serial type='pty'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </serial>")
+	xml.append("    <console type='pty' tty='/dev/pts/1'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target type='serial' port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </console>")
+	xml.append("    <channel type='spicevmc'>")
+	xml.append("      <target type='virtio' name='com.redhat.spice.0' state='disconnected'/>")
+	xml.append("      <alias name='channel0'/>")
+	xml.append("      <address type='virtio-serial' controller='0' bus='0' port='1'/>")
+	xml.append("    </channel>")
+	xml.append("    <input type='mouse' bus='ps2'/>")
+	xml.append("    <input type='keyboard' bus='ps2'/>")
+	xml.append("    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>")
+	xml.append("      <listen type='address' address='0.0.0.0'/>")
+	xml.append("    </graphics>")
+	xml.append("    <video>")
+	xml.append("      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1'/>")
+	xml.append("      <alias name='video0'/>")
+	xml.append("    </video>")
+	xml.append("    <memballoon model='virtio'>")
+	xml.append("    </memballoon>")
+	xml.append("  </devices>")
+	xml.append("</domain>")
+	return xml
+	# oFile=open(lab_name + "-vcp-" + node + ".xml","w")
+	# for line in xml: oFile.write(line + '\n')
+	# oFile.close()
+
+def create_vrr_xml(node,d1): 
+	lab_name = d1['lab_name']
+	re_file = d1['files']['vrr']['re_file']
+	if d1['ovs']:
+		brmode = d1['ovs']
+	else:
+		brmode=['']
+	interfaces = list(d1['nodes'][node]['interfaces'])
+	interfaces.sort()
+	dest_dir=d1['image_destination']
+	mgmt = d1['lab_name'] + "-" + d1['mgmt']['intf']
+	xml = []
+	xml.append("<domain type='kvm'>")
+	xml.append("  <name>"  + lab_name + "-" + node + "</name>")
+	xml.append("  <memory unit='KiB'>1048576</memory>")
+	xml.append("  <currentMemory unit='KiB'>1048576</currentMemory>")
+	xml.append("  <vcpu placement='static'>1</vcpu>")
+	xml.append("  <resource>")
+	xml.append("    <partition>/machine</partition>")
+	xml.append("  </resource>")
+	xml.append("  <os>")
+	xml.append("    <type arch='x86_64' machine='"  + MACHINE_TYPE + "'>hvm</type>")
+	xml.append("    <boot dev='hd'/>")
+	xml.append("  </os>")
+	xml.append("  <features>")
+	xml.append("    <acpi/>")
+	xml.append("    <apic/>")
+	xml.append("  </features>")
+	xml.append("  <cpu mode='custom' match='exact'>")
+	xml.append("    <model fallback='allow'>SandyBridge</model>")
+	xml.append("  </cpu>")
+	xml.append("  <clock offset='utc'>")
+	xml.append("    <timer name='rtc' tickpolicy='catchup'/>")
+	xml.append("    <timer name='pit' tickpolicy='delay'/>")
+	xml.append("    <timer name='hpet' present='no'/>")
+	xml.append("  </clock>")
+	xml.append("  <on_poweroff>destroy</on_poweroff>")
+	xml.append("  <on_reboot>restart</on_reboot>")
+	xml.append("  <on_crash>restart</on_crash>")
+	xml.append("  <pm>")
+	xml.append("    <suspend-to-mem enabled='no'/>")
+	xml.append("    <suspend-to-disk enabled='no'/>")
+	xml.append("  </pm>")
+	xml.append("  <devices>")
+	xml.append("    <emulator>/usr/bin/kvm-spice</emulator>")
+	xml.append("    <disk type='file' device='disk'>")
+	xml.append("      <driver name='qemu' type='qcow2'/>")
+	xml.append("      <source file='"+ dest_dir + "/" + lab_name + "/" + node + "/" + re_file + "'/>")
+	xml.append("      <backingStore/>")
+	xml.append("      <target dev='hda' bus='ide'/>")
+	xml.append("    </disk>")
+	xml.append("    <controller type='pci' index='0' model='pci-root'>")
+	xml.append("      <alias name='pci.0'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='ide' index='0'>")
+	xml.append("      <alias name='ide'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='virtio-serial' index='0'>")
+	xml.append("      <alias name='virtio-serial0'/>")
+	xml.append("    </controller>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + mgmt + "'/>")
+	# xml.append("      <target dev='" + node + "-re_em0'/>")
+	#xml.append("      <model type='e1000'/>")
+	xml.append("      <mac address='" + d1['nodes'][node]['fxp0']['mac'] +"'/>")
+	xml.append("      <model type='virtio'/>")
+	xml.append("    </interface>")
+	for i in interfaces:
+		xml.append("    <interface type='bridge'>")
+		xml.append("      <source bridge='" + lab_name + "-" + d1['nodes'][node]['interfaces'][i]+ "'/>")
+		if d1['nodes'][node]['interfaces'][i] in  brmode:
+			xml.append("      <virtualport type='openvswitch' />")
+		tmp=i.replace('/','.')
+		# xml.append("      <target dev='" + lab_name + "-" + tmp + "-" + node + "'/>")
+		# xml.append("      <model type='e1000'/>")
+		xml.append("      <model type='virtio'/>")
+		xml.append("    </interface>")
+	xml.append("    <serial type='pty'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </serial>")
+	xml.append("    <console type='pty' tty='/dev/pts/1'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target type='serial' port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </console>")
+	xml.append("    <channel type='spicevmc'>")
+	xml.append("      <target type='virtio' name='com.redhat.spice.0' state='disconnected'/>")
+	xml.append("      <alias name='channel0'/>")
+	xml.append("      <address type='virtio-serial' controller='0' bus='0' port='1'/>")
+	xml.append("    </channel>")
+	xml.append("    <input type='mouse' bus='ps2'/>")
+	xml.append("    <input type='keyboard' bus='ps2'/>")
+	xml.append("    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>")
+	xml.append("      <listen type='address' address='0.0.0.0'/>")
+	xml.append("    </graphics>")
+	xml.append("    <video>")
+	xml.append("      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1'/>")
+	xml.append("      <alias name='video0'/>")
+	xml.append("    </video>")
+	xml.append("    <memballoon model='virtio'>")
+	xml.append("    </memballoon>")
+	xml.append("  </devices>")
+	xml.append("</domain>")
+	return xml
+	# oFile=open(lab_name + "-" +node + ".xml","w")
+	# for line in xml: oFile.write(line + '\n')
+	# oFile.close()
+
+def create_vcp_vmx_xml(node, d1):
+	lab_name = d1['lab_name']
+	re_file = d1['files']['vmx']['re_file']
+	if 'ovs' in d1.keys():
+		brmode = d1['ovs']
+	else:
+		brmode=['']
+	interfaces = list(d1['nodes'][node]['interfaces'])
+	interfaces.sort()
+	dest_dir=d1['image_destination']
+	mgmt = d1['lab_name'] + "-" + d1['mgmt']['intf']
+	xml = []
+	xml.append("<domain type='kvm'>")
+	xml.append("  <name>" + lab_name + "-vcp-" + node + "</name>")
+	xml.append("  <memory unit='KiB'>1048576</memory>")
+	xml.append("  <currentMemory unit='KiB'>1048576</currentMemory>")
+	xml.append("  <vcpu placement='static'>1</vcpu>")
+	xml.append("  <cputune>")
+	xml.append("    <vcpupin vcpu='0' cpuset='0'/>")
+	xml.append("  </cputune>")
+	xml.append("  <resource>")
+	xml.append("    <partition>/machine</partition>")
+	xml.append("  </resource>")
+	xml.append("  <sysinfo type='smbios'>")
+	xml.append("    <bios>")
+	xml.append("      <entry name='vendor'>Juniper</entry>")
+	xml.append("    </bios>")
+	xml.append("    <system>")
+	xml.append("      <entry name='manufacturer'>VMX</entry>")
+	xml.append("      <entry name='product'>VM-vcp_" + node + "-161-re-0</entry>")
+	xml.append("      <entry name='version'>0.1.0</entry>")
+	xml.append("    </system>")
+	xml.append("  </sysinfo>")
+	xml.append("  <os>")
+	xml.append("    <type arch='x86_64' machine='"  + MACHINE_TYPE + "'>hvm</type>")
+	xml.append("    <boot dev='hd'/>")
+	xml.append("    <smbios mode='sysinfo'/>")
+	xml.append("  </os>")
+	xml.append("  <features>")
+	xml.append("    <acpi/>")
+	xml.append("    <apic/>")
+	xml.append("    <pae/>")
+	xml.append("  </features>")
+	xml.append("  <cpu mode='host-model'>")
+	xml.append("    <model fallback='allow'/>")
+	xml.append("    <topology sockets='1' cores='1' threads='1'/>")
+	xml.append("  </cpu>")
+	xml.append("  <clock offset='utc'/>")
+	xml.append("  <on_poweroff>destroy</on_poweroff>")
+	xml.append("  <on_reboot>restart</on_reboot>")
+	xml.append("  <on_crash>restart</on_crash>")
+	xml.append("  <devices>")
+	# xml.append("    <emulator>/usr/bin/kvm-spice</emulator>")
+	xml.append("    <emulator>/usr/bin/qemu-system-x86_64</emulator>")
+	xml.append("    <disk type='file' device='disk'>")
+	xml.append("      <driver name='qemu' type='qcow2' cache='directsync'/>")
+	xml.append("      <source file='"+ dest_dir + "/" + lab_name + "/" + node + "/" + re_file + "'/>")
+	xml.append("      <backingStore/>")
+	xml.append("      <target dev='hda' bus='ide'/>")
+	xml.append("      <alias name='ide0-0-0'/>")
+	xml.append("    </disk>")
+	xml.append("    <disk type='file' device='disk'>")
+	xml.append("      <driver name='qemu' type='qcow2' cache='directsync'/>")
+	xml.append("      <source file='" + dest_dir + "/" + lab_name + "/" + node + "/vmxhdd.img'/>")
+	xml.append("      <backingStore/>")
+	xml.append("      <target dev='hdb' bus='ide'/>")
+	xml.append("      <alias name='ide0-0-1'/>")
+	xml.append("    </disk>")
+	xml.append("    <disk type='file' device='disk'>")
+	xml.append("      <driver name='qemu' type='raw' cache='directsync'/>")
+	xml.append("      <source file='" + dest_dir + "/" + lab_name + "/" + node + "/metadata-usb-re.img'/>")
+	xml.append("      <backingStore/>")
+	xml.append("      <target dev='sda' bus='usb'/>")
+	xml.append("      <alias name='usb-disk0'/>")
+	xml.append("    </disk>")
+	xml.append("    <controller type='usb' index='0'>")
+	xml.append("      <alias name='usb'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='ide' index='0'>")
+	xml.append("      <alias name='ide'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='pci' index='0' model='pci-root'>")
+	xml.append("      <alias name='pci.0'/>")
+	xml.append("    </controller>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + mgmt + "'/>")
+	xml.append("      <model type='e1000'/>")
+	# xml.append("      <target dev='vcp-ext-" + node +"' />")
+	xml.append("      <model type='virtio'/>")
+	xml.append("      <mac address='" + d1['nodes'][node]['fxp0']['mac'] +"'/>")
+	xml.append("    </interface>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + lab_name + "Int" + node + "' />")
+	# xml.append("      <target dev='" + lab_name + "-vcp-int-" + node + "' />")
+	xml.append("      <model type='virtio'/>")
+	xml.append("    </interface>")
+	# xml.append("    <serial type='tcp'>")
+	# xml.append("      <source mode='bind' host='127.0.0.1' service='" + console +"'/>")
+	# xml.append("      <protocol type='telnet'/>")
+	# xml.append("      <target port='0'/>")
+	# xml.append("      <alias name='serial0'/>")
+	# xml.append("    </serial>")
+	# xml.append("    <console type='tcp'>")
+	# xml.append("      <source mode='bind' host='127.0.0.1' service='" + console +"'/>")
+	# xml.append("      <protocol type='telnet'/>")
+	# xml.append("      <target type='serial' port='0'/>")
+	# xml.append("      <alias name='serial0'/>")
+	# xml.append("    </console>")
+	xml.append("    <controller type='virtio-serial' index='0'>")
+	xml.append("      <alias name='virtio-serial0'/>")
+	xml.append("    </controller>")
+	xml.append("    <serial type='pty'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </serial>")
+	xml.append("    <console type='pty' tty='/dev/pts/1'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target type='serial' port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </console>")
+	xml.append("	 <channel type='spicevmc'>")
+	xml.append("		<target type='virtio' name='com.redhat.spice.0' state='disconnected'/>")
+	xml.append("		<alias name='channel0'/>")
+	xml.append("		<address type='virtio-serial' controller='0' bus='0' port='1'/>")
+	xml.append("	 </channel>")
+	xml.append("    <input type='tablet' bus='usb'>")
+	xml.append("      <alias name='input0'/>")
+	xml.append("    </input>")
+	xml.append("    <input type='mouse' bus='ps2'/>")
+	xml.append("    <input type='keyboard' bus='ps2'/>")
+	xml.append("    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>")
+	xml.append("      <listen type='address' address='0.0.0.0'/>")
+	xml.append("    </graphics>")
+	xml.append("    <video>")
+	xml.append("      <model type='cirrus' vram='16384' heads='1'/>")
+	xml.append("      <alias name='video0'/>")
+	xml.append("    </video>")
+	xml.append("    <memballoon model='virtio'>")
+	xml.append("      <alias name='balloon0'/>")
+	xml.append("    </memballoon>")
+	xml.append("  </devices>")
+	xml.append("</domain>")
+	return xml
+	# oFile=open(lab_name + "-vcp-" + node + ".xml","w")
+	# for line in xml: oFile.write(line + '\n')
+	# oFile.close()
+
+def create_vpfe_vmx_xml(node,d1):
+	lab_name = d1['lab_name']
+	pfe_file = d1['files']['vmx']['pfe_file']
+	if 'ovs' in d1.keys():
+		brmode = d1['ovs']
+	else:
+		brmode=['']
+	interfaces = list(d1['nodes'][node]['interfaces'])
+	interfaces.sort()
+	dest_dir=d1['image_destination']
+	mgmt = d1['lab_name'] + "-" + d1['mgmt']['intf']
+	xml=[]
+	xml.append("<domain type='kvm'>")
+	xml.append("  <name>" + lab_name + "-vpfe-" + node +"</name>")
+	xml.append("  <memory unit='KiB'>3145728</memory>")
+	xml.append("  <currentMemory unit='KiB'>3145728</currentMemory>")
+#	xml.append("  <memoryBacking>")
+#	xml.append("    <hugepages/>")
+#	xml.append("    <nosharepages/>")
+#	xml.append("  </memoryBacking>")
+	xml.append("  <vcpu placement='static'>4</vcpu>")
+	xml.append("  <numatune>")
+	xml.append("    <memory mode='strict' nodeset='0'/>")
+	xml.append("  </numatune>")
+	xml.append("  <resource>")
+	xml.append("    <partition>/machine</partition>")
+	xml.append("  </resource>")
+	xml.append("  <os>")
+	xml.append("    <type arch='x86_64' machine='"  + MACHINE_TYPE + "'>hvm</type>")
+	xml.append("    <boot dev='hd'/>")
+	xml.append("  </os>")
+	xml.append("  <features>")
+	xml.append("    <acpi/>")
+	xml.append("  </features>")
+	xml.append("  <cpu mode='host-passthrough'>")
+	xml.append("    <model fallback='allow'/>")
+	xml.append("    <topology sockets='1' cores='4' threads='1'/>")
+	xml.append("  </cpu>")
+	xml.append("  <clock offset='utc'/>")
+	xml.append("  <on_poweroff>destroy</on_poweroff>")
+	xml.append("  <on_reboot>restart</on_reboot>")
+	xml.append("  <on_crash>restart</on_crash>")
+	xml.append("  <devices>")
+	# xml.append("    <emulator>/usr/bin/kvm-spice</emulator>")
+	xml.append("    <emulator>/usr/bin/qemu-system-x86_64</emulator>")
+	xml.append("    <disk type='file' device='disk'>")
+	xml.append("      <driver name='qemu' type='raw' cache='directsync'/>")
+	xml.append("      <source file='" + dest_dir + "/" + lab_name + "/" + node + "/" + pfe_file + "'/>")
+	xml.append("      <backingStore/>")
+	xml.append("      <target dev='hda' bus='ide'/>")
+	xml.append("      <alias name='ide0-0-0'/>")
+	xml.append("    </disk>")
+	xml.append("    <controller type='pci' index='0' model='pci-root'>")
+	xml.append("      <alias name='pci.0'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='usb' index='0'>")
+	xml.append("      <alias name='usb'/>")
+	xml.append("    </controller>")
+	xml.append("    <controller type='ide' index='0'>")
+	xml.append("      <alias name='ide'/>")
+	xml.append("    </controller>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + mgmt + "'/>")
+	# xml.append("      <target dev='vpfe-ext-" + node + "'/>")
+	xml.append("      <model type='virtio'/>")
+	xml.append("    </interface>")
+	xml.append("    <interface type='bridge'>")
+	xml.append("      <source bridge='" + lab_name + "Int" + node + "'/>")
+	# xml.append("      <target dev='" + lab_name + "-vpfe-int-" + node + "'/>")
+	xml.append("      <model type='virtio'/>")
+	xml.append("    </interface>")
+	for i in interfaces:
+		xml.append("    <interface type='bridge'>")
+		xml.append("      <source bridge='" + lab_name + "-" + d1['nodes'][node]['interfaces'][i]+ "'/>")
+		if d1['nodes'][node]['interfaces'][i] in  brmode:
+			xml.append("      <virtualport type='openvswitch' />")
+		tmp=i.replace('/','.')
+		# xml.append("      <target dev='"+ lab_name + "-"+ tmp + "-" + node + "'/>")
+		xml.append("      <model type='virtio'/>")
+		xml.append("      <mtu size='9192'/>")
+		xml.append("    </interface>")
+	#xml.append("    <serial type='tcp'>")
+	#xml.append("      <source mode='bind' host='127.0.0.1' service='" + console + "'/>")
+	#xml.append("      <protocol type='telnet'/>")
+	#xml.append("      <target port='0'/>")
+	#xml.append("      <alias name='serial0'/>")
+	#xml.append("    </serial>")
+	#xml.append("    <console type='tcp'>")
+	#xml.append("      <source mode='bind' host='127.0.0.1' service='" + console + "'/>")
+	#xml.append("      <protocol type='telnet'/>")
+	#xml.append("      <target type='serial' port='0'/>")
+	#xml.append("      <alias name='serial0'/>")
+	#xml.append("    </console>")
+	xml.append("    <controller type='virtio-serial' index='0'>")
+	xml.append("      <alias name='virtio-serial0'/>")
+	xml.append("    </controller>")
+	xml.append("    <serial type='pty'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </serial>")
+	xml.append("    <console type='pty' tty='/dev/pts/1'>")
+	xml.append("      <source path='/dev/pts/1'/>")
+	xml.append("      <target type='serial' port='0'/>")
+	xml.append("      <alias name='serial0'/>")
+	xml.append("    </console>")
+	xml.append("	 <channel type='spicevmc'>")
+	xml.append("		<target type='virtio' name='com.redhat.spice.0' state='disconnected'/>")
+	xml.append("		<alias name='channel0'/>")
+	xml.append("		<address type='virtio-serial' controller='0' bus='0' port='1'/>")
+	xml.append("	 </channel>")
+	xml.append("    <input type='tablet' bus='usb'>")
+	xml.append("      <alias name='input0'/>")
+	xml.append("    </input>")
+	xml.append("    <input type='mouse' bus='ps2'/>")
+	xml.append("    <input type='keyboard' bus='ps2'/>")
+	xml.append("    <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'>")
+	xml.append("      <listen type='address' address='0.0.0.0'/>")
+	xml.append("    </graphics>")
+	xml.append("    <video>")
+	xml.append("      <model type='cirrus' vram='16384' heads='1'/>")
+	xml.append("      <alias name='video0'/>")
+	xml.append("    </video>")
+	xml.append("    <memballoon model='virtio'>")
+	xml.append("      <alias name='balloon0'/>")
+	xml.append("    </memballoon>")
+	xml.append("  </devices>")
+	xml.append("</domain>")
+	return xml
+	# oFile=open(lab_name + "-vpfe-" + node + ".xml","w")
+	# for line in xml: oFile.write(line + '\n')
+	# oFile.close()
+
+def create_dnsmasq_conf(d1):
+	print("Create file dnsmasq.conf")
+	cfg=[]
+	nodes=list(d1['nodes'].keys())
+	cfg.append("interface=" + d1['lab_name'] + "-" + d1['mgmt']['intf'])
+	ip_low = d1['dnsmasq']['low']
+	ip_high = d1['dnsmasq']['high']
+	# (ip_low,ip_high) = iplib.subnet_low_high(d1['mgmt']['ip'])
+	cfg.append("dhcp-range=" + ip_low + "," + ip_high + ",12h")
+	(ip_gw,prefix) = d1['mgmt']['ip'].split("/")
+	cfg.append("dhcp-option=150," + ip_gw)
+	dmqprot=d1['dnsmasq']['protocol']
+	cfg.append("dhcp-option=encap:43,3,\""+ dmqprot+"\"")
+	for i in nodes:
+		cfg.append("dhcp-option=tag:" + i + ",encap:43,1,\"" + i + ".conf\"")
+		mac_address=d1['nodes'][i]['fxp0']['mac']
+		(ip_address,prefix1)=d1['nodes'][i]['fxp0']['ip'].split("/")
+		if d1['nodes'][i]['type']=='vqfx':
+			cfg.append("dhcp-host=" + mac_address +  "," + ip_address +"," + i + ",set:" + i)
+		else:
+			cfg.append("dhcp-host=" + mac_address +  "," + ip_address +",set:" + i)
+
+	oFile=open("dnsmasq.conf","w")
+	for line in cfg: oFile.write(line + '\n')
+	oFile.close()
+
+def create_initial_config(d1):
+	nodes=list(d1['nodes'].keys())
+	for i in nodes:
+		cfg=[]
+		cfg.append("system {")
+		cfg.append("\thost-name " + i + ";")
+		cfg.append("\troot-authentication {")
+		cfg.append(" \t\tencrypted-password \"" + md5_crypt.encrypt((d1['login']['root_password'])) + "\";")
+		if d1['login']['ssh_key']:
+			cfg.append(" \t\tssh-rsa \"" + d1['login']['ssh_key'] + "\";")
+		cfg.append("\t}")
+		cfg.append("\tlogin {\n\t\tuser admin {\n\t\t\tclass super-user;")
+		cfg.append("\t\t\tauthentication {")
+		cfg.append(" \t\t\t\tencrypted-password \"" + md5_crypt.encrypt((d1['login']['password'])) + "\";")
+		if d1['login']['ssh_key']:
+			cfg.append(" \t\t\t\tssh-rsa \"" + d1['login']['ssh_key'] + "\";")
+		cfg.append("\t\t\t}\n\t\t}\n\t}")
+		cfg.append("\tservices {\n\t\tssh;\n\t\tnetconf {\n\t\t\tssh;")
+		cfg.append("\t\t}\n\t}")
+		cfg.append("\tsyslog {\n\t\tuser * {\n\t\t\t any emergency;")
+		cfg.append("\t\t}")
+		cfg.append("\t\tfile messages {\n\t\t\t any notice;\n\t\t\t authorization info;\n\t\t}")
+		cfg.append("\t\tfile interactive-commands {\n\t\t\t interactive-commands any;\n\t\t}")
+		cfg.append("\t}")
+		if d1['nodes'][i]['type'] == 'vqfx':
+			cfg.append("\textensions {\n\t\tproviders {\n\t\t\tjuniper {\n\t\t\t\tlicense-type juniper deployment-scope commercial;")
+			cfg.append("\t\t\t}")
+			cfg.append("\t\t\tchef {\n\t\t\t\tlicense-type juniper deployment-scope commercial;")
+			cfg.append("\t\t\t}\n\t\t}\n\t}")
+		cfg.append("}")
+
+		if d1['nodes'][i]['type'] == 'vmx':
+			cfg.append("chassis {\n\tfpc 0 {\n\t\tlite-mode;\n\t}\n\tnetwork-services enhanced-ip;")
+			cfg.append("}")
+			cfg.append("interfaces {\n\tfxp0 {\n\t\tunit 0 {\n\t\t\tfamily inet {")
+			cfg.append("\t\t\t\taddress " + d1['nodes'][i]['fxp0']['ip'] + ";")
+			cfg.append("\t\t\t}\n\t\t}\n\t}\n}")
+		if d1['nodes'][i]['type'] == 'vqfx':
+			cfg.append("interfaces {\n\tem0 {\n\t\tunit 0 {\n\t\t\tfamily inet {")
+			cfg.append("\t\t\t\taddress " + d1['nodes'][i]['fxp0']['ip'] + ";")
+			cfg.append("\t\t\t}\n\t\t}\n\t}\n}")
+			cfg.append("interfaces {\n\tem1 {\n\t\tunit 0 {\n\t\t\tfamily inet {")
+			cfg.append("\t\t\t\taddress 169.254.0.2/24;")
+			cfg.append("\t\t\t}\n\t\t}\n\t}\n}")
+			cfg.append("forwarding-options {\n\tstorm-control-profiles default {\n\t\tall;\n\t}\n}")
+			cfg.append("protocols {\n\tigmp-snooping {\n\t\tvlan default;\n\t}\n}")
+			cfg.append("vlans {\n\tdefault {\n\t\tvlan-id 1;\n\t}\n}")
+		if d1['nodes'][i]['type'] == 'vsrx':
+			cfg.append("interfaces {\n\tfxp0 {\n\t\tunit 0 {\n\t\t\tfamily inet {")
+			cfg.append("\t\t\t\taddress " + d1['nodes'][i]['fxp0']['ip'] + ";")
+			cfg.append("\t\t\t}\n\t\t}\n\t}\n}")
+		filename=i + ".conf"
+		print("configuration for node ",i," : ", filename)
+		oFile=open(filename,"w")
+		for line in cfg: oFile.write(line + '\n')
+		oFile.close()
+
+def start_stop_domain(domName,cmd):
+	conn = libvirt.open('qemu:///system')
+	if conn == None:
+		print('Failed to open connection to qemu:///system', file=sys.stderr)
+		exit(1)
+	for i in domName:
+		dom=conn.lookupByName(i)
+		if cmd=='start':
+			dom.create()
+			print("these domain will be started : ",i)
+		elif cmd=='stop':
+			dom.destroy()
+			print("these domain will be stopped : ",i)
+	conn.close()
+
+def do_start_stopvm(d1,cmd,domain_to_start):
+	domName=[]
+	if domain_to_start == 'all':
+		for i in d1['nodes'].keys():
+			if d1['nodes'][i]['type']=='vmx' or d1['nodes'][i]['type']=='vqfx':
+				domName.append(d1['lab_name']+"-vcp-" + i)
+				domName.append(d1['lab_name']+"-vpfe-" + i)
+			else:
+				domName.append(d1['lab_name']+"-" + i)
+		start_stop_domain(domName,cmd)
+	elif domain_to_start in d1['nodes'].keys():
+		if d1['nodes'][domain_to_start]['type']=='vmx' or d1['nodes'][domain_to_start]['type']=='vqfx':
+			domName.append(d1['lab_name']+"-vcp-" + domain_to_start)
+			domName.append(d1['lab_name']+"-vpfe-" + domain_to_start)
+		else:
+				domName.append(d1['lab_name']+"-" + domain_to_start)
+		if cmd=='start':
+			print("these domain will be started : ",domName)
+		elif cmd=='stop':
+			print("these domain will be stoped : ",domName)
+		start_stop_domain(domName,cmd)
+
+	else:
+		print("Node ",domain_to_start, "it not avalailable")
+	
+def defineXML(domName,xml):
+	xml_text=""
+	for i in xml:
+		xml_text+=i
+
+	conn = libvirt.open('qemu:///system')
+	if conn == None:
+		print('Failed to open connection to qemu:///system', file=sys.stderr)
+		exit(1)
+#	print("before lookup",domName)
+#	dom0 = conn.lookupByName(domName)
+#	print("after lookup")
+#	if dom0 == None:
+	dom1 = conn.defineXML(xml_text)
+	if dom1 == None:
+		print('Failed to define a domain from an XML definition.', file=sys.stderr)
+	conn.close()
+
+def undefineVM(domName):
+	conn = libvirt.open('qemu:///system')
+	if conn == None:
+		print('Failed to open connection to qemu:///system', file=sys.stderr)
+		exit(1)
+	dom = conn.lookupByName(domName)
+	if dom == None:
+		print('Failed to find the domain '+domName, file=sys.stderr)
+		exit(1)
+	dom.undefine()
+	conn.close()
+
+def print_xml(xml):
+	for i in xml:
+		print(i)
+
+def do_undefinevm(d1):
+	nodes=list(d1['nodes'].keys())
+	lab_name=d1['lab_name']
+	for i in nodes:
+		if  d1['nodes'][i]['type'] == 'vmx':
+			print("Undefine VM for Node ",i)
+			node_name = lab_name + "-vcp-"+ i
+			undefineVM(node_name)
+			node_name = lab_name + "-vpfe-"+ i
+			undefineVM(node_name)
+		elif  d1['nodes'][i]['type'] == 'vqfx':
+			print("Undefine VM for Node ",i)
+			node_name = lab_name + "-vcp-"+ i
+			undefineVM(node_name)
+			node_name = lab_name + "-vpfe-"+ i
+			undefineVM(node_name)
+		elif  d1['nodes'][i]['type'] == 'vsrx':
+			print("Undefine VM for Node ",i)
+			node_name = lab_name + "-"+ i
+			undefineVM(node_name)
+		elif  d1['nodes'][i]['type'] == 'vrr':
+			print("Undefine VM for Node ",i)
+			node_name = lab_name + "-"+ i
+			undefineVM(node_name)
+	path1=d1['image_destination'] + "/" + d1['lab_name'] 	
+	print("Deleting the image files")
+	shutil.rmtree(path1)	
+
+def do_definevm(d1):
+# def create_xml(d1):
+	nodes=list(d1['nodes'].keys())
+	mgmt = d1['lab_name'] + "-" + d1['mgmt']['intf']
+	lab_name = d1['lab_name']
+
+	for i in nodes:
+		if  d1['nodes'][i]['type'] == 'vmx':
+			print("Define VM for Node ",i)
+			domName = lab_name + "-vcp-" + i
+			defineXML(domName,create_vcp_vmx_xml(i,d1))
+			domName = lab_name + "-vpfe-" + i
+			defineXML(domName,create_vpfe_vmx_xml(i,d1))
+		elif  d1['nodes'][i]['type'] == 'vqfx':
+			print("Define VM for Node ",i)
+			domName = lab_name + "-vcp-" + i
+			defineXML(domName,create_vcp_vqfx_xml(i,d1))
+			domName = lab_name + "-vpfe-" + i
+			defineXML(domName,create_vpfe_vqfx_xml(i,d1))
+		elif  d1['nodes'][i]['type'] == 'vsrx':
+			domName = lab_name + "-" + i
+			print("Define VM for Node ",i)
+			defineXML(domName,create_vsrx_xml(i,d1))
+		elif  d1['nodes'][i]['type'] == 'vrr':
+			print("Define VM for Node ",i)
+			domName = lab_name + "-" + i
+			defineXML(domName,create_vrr_xml(i,d1))
+	copy_vm_image(d1)
+	print("creating initial config for nodes. \nCopy these files into the home directory of the TFTP.\nDO THIS BEFORE STARTING the VM ")
+	create_initial_config(d1)
+	print("creating DNSMASQ configuration. \nCopy or append this files into the DNSMASQ server configuration and restart dnsmasq server.\nDO THIS BEFORE STARTING the VM ") 
+	create_dnsmasq_conf(d1)
+
+def copy_vm_image(d1):
+	nodes=d1['nodes'].keys()
+	for i in nodes:
+		dest1=d1['image_destination'] + "/" +  d1['lab_name'] + "/" + i
+		os.makedirs(dest1)
+		print("copying image file for node ",i)
+		if  d1['nodes'][i]['type'] == 'vmx':
+			for j in [d1['files']['vmx']['re_file'],d1['files']['vmx']['pfe_file'],'metadata-usb-re.img','vmxhdd.img']:
+				src_file =  d1['image_source'] + "/" + j
+				dst_file = d1['image_destination'] + "/" + d1['lab_name'] + "/" + i + "/" +  j
+				shutil.copyfile(src_file, dst_file)
+		elif  d1['nodes'][i]['type'] == 'vqfx':
+			for j in [d1['files']['vqfx']['re_file'],d1['files']['vqfx']['pfe_file']]:
+				src_file =  d1['image_source'] + "/" + j
+				dst_file = d1['image_destination'] + "/" + d1['lab_name'] + "/" + i + "/" +j
+				shutil.copyfile(src_file, dst_file)
+		elif  d1['nodes'][i]['type'] == 'vsrx':
+			src_file =  d1['image_source'] + "/" + d1['files']['vsrx']['re_file']
+			dst_file = d1['image_destination'] + "/" + d1['lab_name'] + "/" + i + "/" + d1['files']['vsrx']['re_file'] 
+			shutil.copyfile(src_file, dst_file)
+		elif  d1['nodes'][i]['type'] == 'vrr':
+			src_file =  d1['image_source'] + "/" + d1['files']['vrr']['re_file']
+			dst_file = d1['image_destination'] + "/" + d1['lab_name'] + "/" + i + "/" + d1['files']['vsrx']['re_file'] 
+			shutil.copyfile(src_file, dst_file)
+

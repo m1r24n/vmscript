@@ -1,0 +1,40 @@
+set services analytics streaming-server ns remote-address {{ ns_ip }}
+set services analytics streaming-server ns remote-port {{ ns_port }}
+set services analytics export-profile ns local-address {{ local_address }}
+set services analytics export-profile ns reporting-rate 2
+set services analytics export-profile ns format gpb
+set services analytics export-profile ns transport udp
+set services analytics sensor ifd server-name ns
+set services analytics sensor ifd export-name ns
+set services analytics sensor ifd resource /junos/system/linecard/interface/
+set services analytics sensor ifl server-name ns
+set services analytics sensor ifl export-name ns
+set services analytics sensor ifl resource /junos/system/linecard/interface/logical/usage/
+set services analytics sensor lsp server-name ns
+set services analytics sensor lsp export-name ns
+set services analytics sensor lsp resource /junos/services/label-switched-path/usage/
+set services analytics sensor sr-te-color server-name ns
+set services analytics sensor sr-te-color export-name ns
+set services analytics sensor sr-te-color resource /junos/services/segment-routing/traffic-engineering/ingress/usage/
+set services analytics sensor sid server-name ns
+set services analytics sensor sid export-name ns
+set services analytics sensor sid resource /junos/services/segment-routing/sid/usage/
+set services analytics sensor sr-te-tunnels server-name ns
+set services analytics sensor sr-te-tunnels export-name ns
+set services analytics sensor sr-te-tunnels resource /junos/services/segment-routing/traffic-engineering/tunnel/ingress/usage/
+set protocols mpls sensor-based-stats
+set protocols source-packet-routing telemetry statistics
+set system syslog host {{ ns_ip }} daemon info
+set system syslog host {{ ns_ip }} port 1514
+set system syslog host {{ ns_ip }} match-strings RPM_TEST_RESULTS
+{% for intf in interfaces -%}
+set services rpm probe northstar-ifl test {{ intf }}.0 target address {{ interfaces[intf].target }}
+set services rpm probe northstar-ifl test {{ intf }}.0 probe-count 11
+set services rpm probe northstar-ifl test {{ intf }}.0 probe-interval 5
+set services rpm probe northstar-ifl test {{ intf }}.0 test-interval 60
+set services rpm probe northstar-ifl test {{ intf }}.0 source-address {{ interfaces[intf].source }}
+set services rpm probe northstar-ifl test {{ intf }}.0 moving-average-size 12
+set services rpm probe northstar-ifl test {{ intf }}.0 traps test-completion
+set services rpm probe northstar-ifl test {{ intf }}.0 hardware-timestamp
+{% endfor -%}
+set event-options event-script file rpm-log.slax
