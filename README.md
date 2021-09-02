@@ -31,6 +31,39 @@ This script requires the following :
 - tftp server to provide initial configuration
 - pynetlinux library https://github.com/rlisagor/pynetlinux
 
+## Recompile linux kernel on the KVM host to allow LLDP and LACP frames to pass through
+By default, linux bridge will not allow LLDP and LACP frames to pass through. 
+
+To allow LLDP and LACP frames to be sent and received by the VM, the linux kernel of the KVM host must be recompile
+
+Do the following steps to recompile the linux kernel.
+1. Install the linux kernel and the necessary development tools to compile the kernel.2
+2. Under linux kernel source directory, edit file  **<kernel_source>/net/bridge/br_private.h**, and look for the following entry
+
+		#define BR_GROUPFWD_RESTRICTED
+
+	and change the value to 
+
+		#define BR_GROUPFWD_RESTRICTED 0x0000u
+
+3. Copy kernel configuration file from director /boot into linux kernel source directory as file .config
+4. Compile the linux kernel and install it
+5. Reboot into the new kernel
+
+
+## Set the hugepages on kvm host
+1. on ubuntu/debian, edit file /etc/default/grub, and add the following entry
+
+		GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=48G"
+
+2. Set the maximum hugepages according to the maximum RAM that you have on the KVM host. For example, I set the maximum hugepages memory to 48G on the server with 64G of RAM
+
+3. recreate the grub configuration file. On ubuntu/debian, you can do the following
+
+		sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+4. Reboot the KVM host to enable hugepages memory
+
 ## Junos VM image
 For VMX, use the official vMX release from juniper, **[vmx](http://www.juniper.net/support/downloads/?p=vmx#sw)**. Download the KVM version, uncompres and untar the file, and get four (4) files from image directory (three files for RE are`junos-vmx-***.qcow2`, `vmxhdd.img` and `metadata-usb-re.img`, and one file for PFE is `vFPC-***.img`)
 
