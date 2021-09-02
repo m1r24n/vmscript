@@ -47,12 +47,12 @@ By default vQFX image only support ZTP on interface xe-0/0/N. it doesn't support
 This tool consist of the following script
 - **[junos_vm.py](junos_vm.py)**
 - **[junos_vm_xml.py](junos_vm_xml.py)**
-- **[createvm.py](createvm.py)**
+- **[vmm.py](vmm.py)**
 
 ## junos_vm.py
-This script is the library with functions used by the other scripts (`createvm.py`)
+This script is the library with functions used by the other scripts (`vmm.py`)
 
-## createvm.py
+## vmm.py
 This script will read the definition file (a yaml file), which contain the following information :
 - image files used by Junos VM
 - the source directory for the Junos VM's image
@@ -71,20 +71,18 @@ This script will do the following (depend on the argument given to the script)
 - argument `stop <vm_name | all>`, this script will start stop VMs instances on hypervisor
 
 ## How to run the script
-1. Create a working directory (for example ~/lab1), and create the definition file (sample **[topo5.yaml](topo5.yaml)**)  inside this directory
+1. Create a working directory (for example ~/lab1), and create the definition file 
 2. Copy the Junos VM images into the source directory (please refer to the definition file for this)
-3. Run script to create the bridge, for example **createvm.py -c topo5.yaml addbr**
-4. Run script to create VM instances and copy the VM image, for example **createvm.py -c topo5.yaml definevm**
-5. copy file `dnsmasq.conf` into /etc or add it into the existing DNSMASQ configuratio file, and restart DNSMASQ service
-6. copy junos VM initial configuration (*.conf) into TFTP home directory, for example /var/lib/tftboot. Verify that TFTP service is up and running
-7. Run script to run the VM intances. it can be **createvm.py -c topo5.yaml start all**, to start all instances at the same time or it can be **createvm.py -c topo5.yaml start <node_name>**, to start the instance one by one
-8. Wait for 5 to 10 minutes (depend on how many Junos VMs that you define in your topology) for the VMs to be up and running
-9. To verify, try to access the console port of the Junos VMs (if you get `login:` prompt, it means the VM is up and running) or ping the management ip address of the Junos VM
-10. To stop the VM instances,  it can be **createvm.py -c topo5.yaml stop all**, to stop all instances at the same time or it can be **createvm.py -c topo5.yaml stop <node_name>**, to stop the instance one by one
-11. To remove the VM instances and VM image files, run **createvm.py -c topo5.yaml undefinevm**
+3. Run script to create the bridge, for example **sudo vmm.py -c lab.yaml addbr**
+4. Run script to create VM instances and copy the VM image, for example **vmm.py -c lab.yaml definevm**
+5. Run script to run the VM intances. it can be **vmm.py -c lab.yaml start**, to start all instances at the same time or it can be **vmm.py -c lab.yaml start <node_name>**, to start the instance one by one
+6. Wait for 5 to 10 minutes (depend on how many Junos VMs that you define in your topology) for the VMs to be up and running
+7. Run **vmm.py -c lab.yaml init_vm** to configure management ip address, login information, and enabling ssh/netconf on the junos VM.
+8. To verify, try to access the console port of the Junos VMs (if you get `login:` prompt, it means the VM is up and running) or ping the management ip address of the Junos VM
+9. To stop the VM instances,  it can be **vmm.py -c lab.yaml stop all**, to stop all instances at the same time or it can be **vmm.py -c lab.yaml stop <node_name>**, to stop the instance one by one
+19. To remove the VM instances and VM image files, run **vmm.py -c lab.yaml undefinevm**
+11. To remove the bridges, run **sudo vmm.py -c lab.yaml delbr**
 
-here is the topology for the sample definition file 
-![](topo5.png)
 
 ## Basic command
 - `virsh list` : to display the running VMs
