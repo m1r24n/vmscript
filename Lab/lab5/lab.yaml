@@ -23,13 +23,13 @@ ns:
 fabric:
   subnet: 10.100.1.128/25
   topology:
-    - [ 0x7d, r1, ge-0/0/2, r2, ge-0/0/2 ]
-    - [ 0x7d, r1, ge-0/0/3, r2, ge-0/0/3 ]
+    - [ 0x7d, r1, ge-0/0/0, r2, ge-0/0/2 ]
+    - [ 0x7d, r1, ge-0/0/1, r2, ge-0/0/3 ]
     - [ 0x7d, r2, ge-0/0/4, r3, ge-0/0/2 ]
     - [ 0x7d, r2, ge-0/0/5, r3, ge-0/0/3 ]
 nodes:
   r1:
-    type: vmx-n
+    type: vmx
     mgmt: 
       ip: [ 10.1.100.81/24 ]
     interfaces:
@@ -39,11 +39,11 @@ nodes:
           iso: 49.0001.0101.0025.5001.00
         protocol:
           isis: passive
-      ge-0/0/0:
-        bridge: pe1ge0
+      ge-0/0/2:
+        bridge: pe1ge2
         family:
           inet: 10.101.1.1/24
-      ge-0/0/1:
+      ge-0/0/3:
         bridge: lan1
         family:
           inet: 10.1.1.81/24
@@ -51,7 +51,7 @@ nodes:
         protocol:
           isis: passive
   r2:
-    type: vmx-n
+    type: vmx
     mgmt: 
       ip: [ 10.1.100.83/24]
     interfaces:
@@ -73,7 +73,7 @@ nodes:
         protocol:
           isis: passive
   r3:
-    type: vmx-n
+    type: vmx
     mgmt: 
       ip: [ 10.1.100.85/24]
     interfaces:

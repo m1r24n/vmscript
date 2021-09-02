@@ -1,3 +1,4 @@
+{% if interfaces -%}
 interfaces {
     {% for intf in interfaces -%}
     {{ intf }} {
@@ -36,9 +37,9 @@ interfaces {
     }
     {% endfor -%}
 }
+{% endif -%}
+{% if protocols -%}
 protocols { 
-	{% if protocols -%}
-
 	{% for prot in protocols -%}
 
 	{{prot}} {
@@ -68,6 +69,5 @@ protocols {
 	}
 
 	{% endfor -%}
-
-	{% endif -%}
 }
+{% endif -%}

@@ -18,8 +18,6 @@ from jnpr.junos.utils.scp import SCP
 from ovs_vsctl import VSCtl
 import json
 
-
-
 # install ovs_vsctl : sudo pip3 install git+https://github.com/iwaseyusuke/python-ovs-vsctl.git
 # from jnpr.junos import Device
 # from jnpr.junos.utils.config import Config
@@ -31,6 +29,7 @@ from passlib.hash import md5_crypt
 # LACP Requires modified bridge kernel module
 MTU = 9000
 GROUP_FWD_MASK="0x400c"
+DUMMY_BRIDGE='dumbr0'
 #GROUP_FWD_MASK="0x4000"
 SLAX_SCRIPT='/home/debian/git/vmscript/scripts/rpm-log.slax'
 mask_ipv4 = 0b1
@@ -94,6 +93,7 @@ def check_argv(argv):
 								retval['cmd']=argv[0]
 								retval['nodes']=argv[1]
 							retval['path']=path
+	# print("Retval ",retval)
 	return retval
 
 def read_config(config1):
@@ -219,7 +219,11 @@ def create_config_interfaces(d1):
 
 	for i in d2['nodes'].keys():
 		intf = d2['nodes'][i]['interfaces']
-		d1['nodes'][i]['interfaces'].update(intf)				
+		if not d1['nodes'][i]['interfaces']:
+			# print("null interface, host ",i)
+			d1['nodes'][i]['interfaces']=intf
+		else:
+			d1['nodes'][i]['interfaces'].update(intf)				
 	#print(json.dumps(d1,sort_keys=False, indent=4))
 	#pprint.pprint(d2)
 
@@ -285,6 +289,7 @@ def do_bridge(d1):
 		bridges=[mgmt_intf]
 	else:
 		bridges=[]
+	bridges.append(DUMMY_BRIDGE)
 	for i in nodes:
 		'''
 		# original code
@@ -323,9 +328,11 @@ def do_bridge(d1):
 				# set /sys/class/net/topo5-Vqfx2lan3/bridge/group_fwd_mask
 				path1="/sys/class/net/" + i + "/bridge/group_fwd_mask"
 				path2="/sys/devices/virtual/net/" + i + "/bridge/multicast_snooping"
+				path3="/proc/sys/net/ipv6/conf/" + i + "/disable_ipv6"
 				arg=[]
 				arg.append("echo " + GROUP_FWD_MASK + " > " +  path1) 
 				arg.append("echo 0 > " + path2) 
+				arg.append("echo 1 > " + path3) 
 				for i in arg:
 					# print(i)
 					cmd=["bash", "-c",i]
@@ -367,6 +374,26 @@ def send_init(i):
 	c1="virsh console " + i['nodes']
 	print("configuring ",i['nodes'])
 	if i['type'] == 'vqfx':
+		'''s_e = [
+				["","login:"],
+				["root", "root@:RE:0%"],
+				["cli","root>"],
+				["edit","root#"],
+				["delete interfaces","root#"],
+				["set system host-name " + i['hostname'],"root#"],
+				["set system root-authentication encrypted-password \"" + my_hash_root + "\"","root#"],
+				["set system services ssh","root#"],
+				["set system services netconf ssh","root#"],
+				["set system login user " +  i['user'] + " class super-user authentication encrypted-password \"" + my_hash + "\"","root#"],
+				["set interfaces em0.0 family inet address " + i['mgmt'],"root#"],
+				["set interfaces em1.0 family inet address 169.254.0.2/24","root#"],
+				["set system management-instance","root#"],
+				["set routing-instances mgmt_junos routing-options static route 0.0.0.0/0 next-hop " + i['gateway4'], "root#"],
+				["commit","root@"],
+				["exit","root@"],
+				["exit","root@"],
+				["exit","login:"]
+		'''
 		s_e = [
 				["","login:"],
 				["root", "root@:RE:0%"],
@@ -471,6 +498,26 @@ def send_init(i):
 					["exit","root@:~ #"],
 					["exit","login:"]
 			] 
+	elif i['type'] == 'vsrx':
+		s_e = [
+				["","login:"],
+				["root","root@"],
+				["cli","root>"],
+				["edit","root#"],
+				["set system host-name " + i['hostname'],"root#"],
+				["set system root-authentication encrypted-password \"" + my_hash_root + "\"","root#"],
+				["set system services ssh","root#"],
+				["set system services netconf ssh","root#"],
+				["set system login user " +  i['user'] + " class super-user authentication encrypted-password \"" + my_hash + "\"","root#"],
+				["set interfaces fxp0.0 family inet address " + i['mgmt'],"root#"],
+				["set system management-instance","root#"],
+				["set routing-instances mgmt_junos routing-options static route 0.0.0.0/0 next-hop " + i['gateway4'], "root#"],
+				["set snmp community public authorization read-only","root#"],
+				["commit","root@"+i['hostname']+"#"],
+				["exit","root@"+i['hostname']+">"],
+				["exit","root@:~ #"],
+				["exit","login:"]
+			] 
 	# print(s_e)
 	p1=pexpect.spawn(c1)
 	for j in s_e:
@@ -522,17 +569,30 @@ def create_data(d1,i):
 				'type' :d1['nodes'][i]['type']
 			}
 		else:
-			retval= {
-				'password':d1['login']['password'],
-				'root_password':d1['login']['root_password'],
-				'user':d1['login']['user'],
-				'nodes' : d1['lab_name'] +"-vcp-" +  i,
-				'hostname' : i,
-				'dual_re' : False,
-				'mgmt' : d1['nodes'][i]['mgmt']['ip'][0],
-				'gateway4' : d1['mgmt']['ip'].split('/')[0],
-				'type' :d1['nodes'][i]['type']
-			}
+			if d1['nodes'][i]['type'] == 'vsrx':
+				retval= {
+					'password':d1['login']['password'],
+					'root_password':d1['login']['root_password'],
+					'user':d1['login']['user'],
+					'nodes' : d1['lab_name'] + "-" +  i,
+					'hostname' : i,
+					'dual_re' : False,
+					'mgmt' : d1['nodes'][i]['mgmt']['ip'][0],
+					'gateway4' : d1['mgmt']['ip'].split('/')[0],
+					'type' :d1['nodes'][i]['type']
+				}
+			else:
+				retval= {
+					'password':d1['login']['password'],
+					'root_password':d1['login']['root_password'],
+					'user':d1['login']['user'],
+					'nodes' : d1['lab_name'] +"-vcp-" +  i,
+					'hostname' : i,
+					'dual_re' : False,
+					'mgmt' : d1['nodes'][i]['mgmt']['ip'][0],
+					'gateway4' : d1['mgmt']['ip'].split('/')[0],
+					'type' :d1['nodes'][i]['type']
+				}
 	return retval
 
 def config_junos(d1):
@@ -954,13 +1014,14 @@ def definevm(d1,i):
 		print("Define VM for Node ",i)
 		copy_vm_image(d1,i)
 		domName = lab_name + "-vcp-" + i
+		# defineXML(domName,junos_vm_xml.create_vcp_vqfx_xml(i,d1))
 		try: 
 			dom0 = conn.lookupByName(domName)
 			print("VM %s is defined" %(domName))
 		except libvirt.libvirtError:
 			print("creating domain %s" %(domName))
+			# print("This is fail")
 			defineXML(domName,junos_vm_xml.create_vcp_vqfx_xml(i,d1))
-
 		domName = lab_name + "-vpfe-" + i
 		try:
 			dom0 = conn.lookupByName(domName)
@@ -1055,7 +1116,7 @@ def copy_vm_image(d1,i):
 				dst_file = d1['image_destination'] + "/" + d1['lab_name'] + "/" + i + "/" +j
 				shutil.copyfile(src_file, dst_file)
 		elif  d1['nodes'][i]['type'] == 'vsrx':
-			src_file =  d1['image_source'] +  "/" + d1['files']['vmx']['dir'] + "/" + d1['files']['vsrx']['re_file']
+			src_file =  d1['image_source'] +  "/" + d1['files']['vsrx']['dir'] + "/" + d1['files']['vsrx']['re_file']
 			dst_file = d1['image_destination'] + "/" + d1['lab_name'] + "/" + i + "/" + d1['files']['vsrx']['re_file'] 
 			shutil.copyfile(src_file, dst_file)
 		elif  d1['nodes'][i]['type'] == 'vrr':

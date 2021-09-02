@@ -1,0 +1,119 @@
+svr1
+------
+auto eth0
+iface eth0 inet static
+address 192.168.101.11/24
+gateway 192.168.101.1
+mtu 1350
+iface eth0 inet6 static
+address 2001:aaaa:1:1::1011/64
+gateway 2001:aaaa:1:1::1
+
+svr6
+------
+auto eth0
+iface eth0 inet static
+address 192.168.101.16/24
+gateway 192.168.101.1
+mtu 1350
+iface eth0 inet6 static
+address 2001:aaaa:1:1::1016/64
+gateway 2001:aaaa:1:1::1
+
+
+svr2
+------
+auto eth0
+iface eth0 inet static
+address 192.168.101.12/24
+gateway 192.168.101.1
+mtu 1350
+iface eth0 inet6 static
+address 2001:aaaa:1:1::1012/64
+gateway 2001:aaaa:1:1::1
+
+
+svr3
+-----
+auto eth0
+iface eth0 inet manual
+auto eth1
+iface eth1 inet manual
+auto bond0
+iface bond0 inet static
+bond-slaves eth1 eth0
+bond-mode 802.3ad
+address 192.168.101.13/24
+gateway 192.168.101.1
+mtu 1350
+iface bond0 inet6 static
+address 2001:aaaa:1:1::1013/64
+gateway 2001:aaaa:1:1::1
+mtu 1350
+
+
+ext 
+
+auto eth0
+iface eth0 inet static
+address 172.16.2.10/24
+gateway 172.16.2.1
+mtu 1350
+iface eth0 inet6 static
+address 2001:bbbb:1:1::10/64
+gateway 2001:bbbb:1:1::1
+mtu 1350
+
+
+svr4
+
+auto eth0
+iface eth0 inet static
+address 192.168.201.14/24
+gateway 192.168.201.1
+mtu 1350
+iface eth0 inet6 static
+address 2001:aaaa:1:2::1014/64
+gateway 2001:aaaa:1:2::1
+mtu 1350
+
+
+svr5
+-----
+auto eth0
+iface eth0 inet manual
+auto eth1
+iface eth1 inet manual
+auto bond0
+iface bond0 inet static
+bond-slaves eth1 eth0
+bond-mode 802.3ad
+address 192.168.201.15/24
+gateway 192.168.201.1
+mtu 1350
+iface bond0 inet6 static
+address 2001:aaaa:1:2::1015/64
+gateway 2001:aaaa:1:2::1
+mtu 1350
+
+
+
+sw1
+loopback  10.100.2.4/32
+AS 65105
+
+sw2 
+loopback 10.100.2.5/32
+AS 65106
+
+
+spine1
+loopback 10.100.1.0/32
+AS : 65001
+
+spine1
+loopback 10.100.1.1/32
+AS : 65002
+
+
+
