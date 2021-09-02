@@ -37,12 +37,12 @@ Reference : [how to compile kernel on debian](https://wiki.debian.org/BuildADebi
 
 Reference : [how to compile kernel on ubuntu](https://wiki.ubuntu.com/Kernel/BuildYourOwnKernel)
 
-By default, linux bridge will not allow LLDP and LACP frames to pass through. 
+By default, linux kernel will not allow LLDP and LACP frames to pass through on linux bridge
 
-To allow LLDP and LACP frames to be sent and received by the VM, the linux kernel of the KVM host must be recompile
+To allow LLDP and LACP frames to be sent and received by the VM, the linux kernel of the KVM host must be recompiled.
 
 Do the following steps to recompile the linux kernel.
-1. Install the linux kernel and the necessary development tools to compile the kernel.2
+1. Install the linux kernel and the necessary development tools to compile the kernel.
 2. Under linux kernel source directory, edit file  **<kernel_source>/net/bridge/br_private.h**, and look for the following entry
 
 		#define BR_GROUPFWD_RESTRICTED
