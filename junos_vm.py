@@ -28,6 +28,7 @@ from passlib.hash import md5_crypt
 # 0x400c is to allow only LLDP and LACP
 # LACP Requires modified bridge kernel module
 MTU = 9000
+# GROUP_FWD_MASK="0x4000"
 GROUP_FWD_MASK="0x400c"
 DUMMY_BRIDGE='dumbr0'
 #GROUP_FWD_MASK="0x4000"
