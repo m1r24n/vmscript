@@ -31,7 +31,7 @@ This script requires the following :
 - tftp server to provide initial configuration
 - pynetlinux library https://github.com/rlisagor/pynetlinux
 
-## Recompile linux kernel on the KVM host to allow LLDP and LACP frames to pass through
+## Recompile linux kernel on the KVM host to allow LACP frames to pass through
 
 Reference : [how to compile kernel on debian](https://wiki.debian.org/BuildADebianKernelPackage)
 
@@ -39,7 +39,7 @@ Reference : [how to compile kernel on ubuntu](https://wiki.ubuntu.com/Kernel/Bui
 
 By default, linux kernel will not allow LLDP and LACP frames to pass through on linux bridge
 
-To allow LLDP and LACP frames to be sent and received by the VM, the linux kernel of the KVM host must be recompiled.
+To allow LACP frames to be sent and received by the VM, the linux kernel of the KVM host must be recompiled.
 
 Do the following steps to recompile the linux kernel.
 1. Install the linux kernel and the necessary development tools to compile the kernel.
