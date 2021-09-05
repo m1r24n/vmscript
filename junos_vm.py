@@ -327,17 +327,18 @@ def do_bridge(d1):
 				intf=pynetlinux.ifconfig.Interface(i.encode('UTF-8'))
 				intf.up()
 				# set /sys/class/net/topo5-Vqfx2lan3/bridge/group_fwd_mask
-				path1="/sys/class/net/" + i + "/bridge/group_fwd_mask"
-				path2="/sys/devices/virtual/net/" + i + "/bridge/multicast_snooping"
-				path3="/proc/sys/net/ipv6/conf/" + i + "/disable_ipv6"
-				arg=[]
-				arg.append("echo " + GROUP_FWD_MASK + " > " +  path1) 
-				arg.append("echo 0 > " + path2) 
-				arg.append("echo 1 > " + path3) 
-				for i in arg:
-					# print(i)
-					cmd=["bash", "-c",i]
-					result=subprocess.Popen(cmd)
+				if i != DUMMY_BRIDGE:
+					path1="/sys/class/net/" + i + "/bridge/group_fwd_mask"
+					path2="/sys/devices/virtual/net/" + i + "/bridge/multicast_snooping"
+					path3="/proc/sys/net/ipv6/conf/" + i + "/disable_ipv6"
+					arg=[]
+					arg.append("echo " + GROUP_FWD_MASK + " > " +  path1) 
+					arg.append("echo 0 > " + path2) 
+					arg.append("echo 1 > " + path3) 
+					for i in arg:
+						# print(i)
+						cmd=["bash", "-c",i]
+						result=subprocess.Popen(cmd)
 			else:
 				print("Bridge ",i," already exist")
 		elif cmd1=='delbr':

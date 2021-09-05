@@ -1,4 +1,5 @@
 lab_name: dc
+image_source : /home/debian/images
 files:
   vmx:
     dir: vmx
@@ -23,7 +24,6 @@ login:
   root_password: pass01
   user: admin
   password: admin
-image_source : /home/debian/images
 image_destination : /home/debian/vm
 fabric:
   subnet: 10.100.4.0/25
