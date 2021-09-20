@@ -8,7 +8,8 @@ files:
     nested: vmx-nested-21.1R1.11.qcow2
   vqfx:
     dir: vqfx
-    re_file: jinstall-vqfx-10-f-20.2R1.10.img
+    re_file: jinstall-vqfx-10-f-20.4R2-S1.4.img
+    re_file1: jinstall-vqfx-10-f-20.2R1.10.img
     pfe_file: vqfx-20.2R1-2019010209-pfe-qemu.qcow
   vsrx:
     dir: vsrx
