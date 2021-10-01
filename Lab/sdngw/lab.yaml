@@ -1,0 +1,35 @@
+lab_name: l1
+files:
+  vmx:
+    dir: vmx
+    re_file: junos-vmx-x86-64-21.3R1.9.qcow2
+    pfe_file: vFPC-20210810.qcow2
+mgmt:
+   intf : lan1
+   ip : 10.1.1.1/24
+exist_bridge:
+  - lan100
+  - lan1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/ubuntu/images
+image_destination : /home/ubuntu/vm
+nodes:
+  gw1:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.1.185/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.1.255.1/32
+      ge-0/0/0:
+        bridge: lan1
+        family:
+          inet: 10.1.1.186/24
+      ge-0/0/1:
+        bridge: lan100
+        family:
+          inet: 10.1.100.186/24
