@@ -1,0 +1,32 @@
+lab_name: vbng
+files:
+  vmx:
+    dir: vmx-20.4R3.8
+    re_file: junos-vmx-x86-64-20.4R3.8.qcow2
+    pfe_file: vFPC-20210824.img
+    nested: vmx-nested-21.1R1.11.qcow2
+mgmt:
+   intf : lan100
+   ip : 10.1.100.1/24
+exist_bridge:
+  - lan100
+  - lan1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+hugepages: yes
+nodes:
+  vbng:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.81/24 ]
+    interfaces:
+      ge-0/0/0:
+        bridge: lan1
+      ge-0/0/1:
+        bridge: access1
+      ge-0/0/2:
+        bridge: access1

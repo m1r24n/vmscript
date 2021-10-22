@@ -54,6 +54,11 @@ protocols {
                     {% if protocols[prot][intf] -%}
                         interface  {{intf}}.0 {
                             {{ protocols[prot][intf] }};
+                            family inet {
+                                bfd-liveness-detection {
+                                    minimum-interval 100;
+                                }
+                            }
                         }
                     {% else -%}
                         interface  {{intf}}.0;
@@ -71,3 +76,15 @@ protocols {
 	{% endfor -%}
 }
 {% endif -%}
+routing-options {
+    forwarding-table {
+        export lb;
+    }
+}
+policy-options {
+    policy-statement lb {
+        then {
+            load-balance per-packet;
+        }
+    }
+}

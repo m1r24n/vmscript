@@ -1,0 +1,80 @@
+lab_name: wan1
+files:
+  vmx:
+    dir: vmx-20.4R3.8
+    re_file: junos-vmx-x86-64-20.4R3.8.qcow2
+    pfe_file: vFPC-20210824.img
+mgmt:
+   intf : lan1
+   ip : 10.1.1.1/24
+exist_bridge:
+  - lan100
+  - lan1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+hugepages: yes
+fabric:
+  subnet: 10.100.255.128/26
+  topology:
+    - [ 0x7d, pe1, ge-0/0/2, p1, ge-0/0/0 ]
+    - [ 0x7d, pe1, ge-0/0/3, p2, ge-0/0/0 ]
+    - [ 0x7d, p1, ge-0/0/1, p2, ge-0/0/1 ]
+    - [ 0x7d, p1, ge-0/0/2, pe2, ge-0/0/2 ]
+    - [ 0x7d, p2, ge-0/0/2, pe2, ge-0/0/3 ]
+nodes:
+  pe1:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.1.91/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.1/32
+          iso: 49.0001.0101.0025.5001.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: pe1ge0
+      ge-0/0/1:
+        bridge: pe1ge1
+  pe2:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.1.92/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.2/32
+          iso: 49.0001.0101.0025.5002.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: pe2ge0
+      ge-0/0/1:
+        bridge: pe2ge1
+  p1:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.1.93/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.3/32
+          iso: 49.0001.0101.0025.5003.00
+        protocol:
+          isis: passive
+  p2:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.1.94/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.4/32
+          iso: 49.0001.0101.0025.5004.00
+        protocol:
+          isis: passive

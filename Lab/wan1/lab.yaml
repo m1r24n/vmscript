@@ -1,0 +1,118 @@
+lab_name: wan1
+files:
+  vmx:
+    dir: vmx-21.3R1.9
+    re_file: junos-vmx-x86-64-21.3R1.9.qcow2
+    pfe_file: vFPC-20210810.qcow2
+    nested: vmx-nested-21.1R1.11.qcow2
+mgmt:
+   intf : lan100
+   ip : 10.1.100.1/24
+exist_bridge:
+  - lan100
+  - lan1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+ns:
+  ip: 10.1.100.79
+  port: 3000
+hugepages: yes
+fabric:
+  subnet: 10.100.255.128/25
+  topology:
+    - [ 0x3d, jkt, ge-0/0/1, bdg, ge-0/0/1 ]
+    - [ 0x3d, jkt, ge-0/0/2, smg, ge-0/0/1 ]
+    - [ 0x3d, jkt, ge-0/0/3, yog, ge-0/0/1 ]
+    - [ 0x3d, jkt, ge-0/0/4, sby, ge-0/0/1 ]
+    - [ 0x3d, bdg, ge-0/0/2, yog, ge-0/0/2 ]
+    - [ 0x3d, smg, ge-0/0/2, yog, ge-0/0/3 ]
+    - [ 0x3d, smg, ge-0/0/3, sby, ge-0/0/2 ]
+    - [ 0x3d, yog, ge-0/0/4, mad, ge-0/0/1 ]
+    - [ 0x3d, sby, ge-0/0/3, mad, ge-0/0/2 ]
+nodes:
+  jkt:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.81/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.1/32
+          iso: 49.0001.0101.0025.5001.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: jktge0
+      ge-0/0/5:
+        bridge: jktge5
+  bdg:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.82/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.2/32
+          iso: 49.0001.0101.0025.5002.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: bdgge0
+  smg:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.83/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.3/32
+          iso: 49.0001.0101.0025.5003.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: smgge0
+  yog:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.84/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.4/32
+          iso: 49.0001.0101.0025.5004.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: yogge0
+  sby:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.85/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.5/32
+          iso: 49.0001.0101.0025.5005.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: sbyge0
+      ge-0/0/0:
+        bridge: sbyge4
+  mad:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.86/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.255.6/32
+          iso: 49.0001.0101.0025.5006.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: madge0
