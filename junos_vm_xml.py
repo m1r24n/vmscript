@@ -260,9 +260,11 @@ def create_vpfe_vmx_xml(node, d1):
 	# cmd_head +="--ram 3072 --vcpu 4 --os-type linux --os-variant rhel7  --arch=x86_64 "
 	#cmd_head +="--ram 3072 --vcpu 4 "
 	if is_hugepages(d1):
-		cmd_head +="--memory=3072,hugepages=yes --memorybacking hugepages=yes --vcpu 3 "
+		#cmd_head +="--memory=3072,hugepages=yes --memorybacking hugepages=yes --vcpu 3 "
+		cmd_head +="--memory=2048,hugepages=yes --memorybacking hugepages=yes --vcpu 3 "
 	else:
-		cmd_head +="--memory=3072 --vcpu 3 "
+		#cmd_head +="--memory=3072 --vcpu 3 "
+		cmd_head +="--memory=2048 --vcpu 3 "
 	cmd_head +="--cpu host-passthrough "
 	cmd_head +="--network bridge=" + mgmt+",model=virtio "
 	# cmd_head +="--network bridge=" + lab_name+"Int" + node +",model=virtio "

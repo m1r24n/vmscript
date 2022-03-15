@@ -52,12 +52,13 @@ def print_syntax():
 	print("  stop : to stop junos VM (it must be followed by VM name or all to stop )")
 	print("  init_vm : to set management IP and password of Junos VM ")
 	print("  config : to config junos VM ")
-	print("  config4ns : add configuration for Northstar ")
+	# print("  config4ns : add configuration for Northstar ")
 
 def check_argv(argv):
 	retval={}
 	len_argv=len(argv)
-	cmd_list=['addbr','delbr','definevm','undefinevm','stop','start','config','init_vm','config4ns']
+	#cmd_list=['addbr','delbr','definevm','undefinevm','stop','start','config','init_vm','config4ns']
+	cmd_list=['addbr','delbr','definevm','undefinevm','stop','start','config','init_vm']
 	#print("len ",len_argv)
 	if len_argv > 3:
 		if '-c' in argv:
@@ -526,7 +527,7 @@ def send_init(i):
 		print("send :",j[0])
 		p1.sendline(j[0])
 		print("expect : ",j[1])
-		p1.expect(j[1])
+		p1.expect(j[1], timeout=120)
 	p1.close()
 
 def init_vm(d1):
@@ -700,6 +701,10 @@ def create_junos_config(d1,i):
 	data1={}
 	data1['interfaces']=None
 	data1['protocols']=None
+	data1['paragon']=None
+	data1['bgp_ls']=None
+	data1['rpm_probe']=None
+	data1['pcep']=None
 	for j in d1['nodes'][i]['interfaces'].keys():
 		#if 'mtu' in  d1['nodes'][i]['interfaces'][j].keys():
 		#	data1=add_mtu(data1,j,d1['nodes'][i]['interfaces'][j]['mtu'])
@@ -729,14 +734,37 @@ def create_junos_config(d1,i):
 					option = ""
 				#print("interface %s protocol %s option %s" %(j,k,option))
 				data1=add_into_protocols(data1,k,j,option)
+	if 'paragon' in d1.keys():
+		data1['paragon']={
+				'insight' : d1['paragon']['insight'],
+				'pcep' : d1['paragon']['pcep'],
+				'loopback' : d1['nodes'][i]['interfaces']['lo0']['family']['inet'].split('/')[0]
+				}
+		for j in d1['nodes'][i]['interfaces'].keys():
+			if 'family' in d1['nodes'][i]['interfaces'][j].keys():
+				if d1['nodes'][i]['interfaces'][j]['family']['inet'].split('/')[1] == '31':
+					data1=add_into_rpm_probe(data1,j,d1['nodes'][i]['interfaces'][j]['family']['inet'])
+		if 'pcep' in d1['nodes'][i].keys():
+			data1['pcep']={
+				'local_address' : d1['nodes'][i]['interfaces']['lo0']['family']['inet'].split('/')[0],
+				'server': d1['paragon']['pcep']
+				}
+	if 'bgp_ls' in d1['nodes'][i].keys():
+		data1['bgp_ls']={
+			'asn': d1['nodes'][i]['bgp_ls']['asn'],
+			'local_address': d1['nodes'][i]['bgp_ls']['local_address']
+		}
 	print("uploading configuration into %s" %(i))
+	#print(data1)
 	config1 = template_config.render(data1)
 	#print(d1)
 	#print(config1)
+
 	ip = d1['nodes'][i]['mgmt']['ip'][0].split('/')[0]
 	user=d1['login']['user']
 	passwd = d1['login']['password']
 	#print("ip %s, user %s, password %s" %(ip,user,passwd))
+	
 	try:
 		dev=Device(host=ip,user=user,password=passwd,gather_facts=False).open()
 		#print(dev.facts)
@@ -746,6 +774,27 @@ def create_junos_config(d1,i):
 		dev.close()
 	except jnpr.junos.exception.ConnectRefusedError:
 		print("connection error")
+	
+	
+def add_into_rpm_probe(dt,intf,ip_addr):
+	intfs='{}.0'.format(intf)
+	src = ip_addr.split('/')[0]
+	dst = remote_ip(ip_addr.split('/')[0])
+	#print("intfs ",intfs,src,dst)
+	if not dt['rpm_probe']:
+		dt['rpm_probe']={intfs:{'src':src,'dst':dst}}
+	if intfs not in dt['rpm_probe'].keys():
+		dt['rpm_probe'][intfs]={'src':src,'dst':dst}
+	return dt
+
+def remote_ip(ipaddr):
+	b1,b2,b3,b4=ipaddr.split('.')
+	if int(b4) % 2: 
+		b4 = str(int(b4) - 1)
+	else:
+		b4 = str(int(b4) + 1)
+	retval = '.'.join((b1,b2,b3,b4))
+	return retval
 
 
 def add_mtu(dt,intf,mtu):

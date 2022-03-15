@@ -88,3 +88,149 @@ policy-options {
         }
     }
 }
+system {
+    services {
+        extension-service {
+            request-response {
+                grpc {
+                    clear-text {
+                        port 32767;
+                    }
+                }
+            }
+        }
+    }
+}
+    
+{% if paragon -%}
+    services {
+        analytics {
+            streaming-server ppf {
+                remote-address {{ paragon.insight }};
+                remote-port 4000;
+            }
+            export-profile ppf {
+                local-address {{ paragon.loopback }};
+                reporting-rate 2;
+                format gpb;
+                transport udp;
+            }
+            sensor ifd {
+                server-name ppf;
+                export-name ppf;
+                resource /junos/system/linecard/interface/;
+            }
+            sensor ifl {
+                server-name ppf;
+                export-name ppf;
+                resource /junos/system/linecard/interface/logical/usage/;
+            }
+            sensor lsp {
+                server-name ppf;
+                export-name ppf;
+                resource /junos/services/label-switched-path/usage/;
+            }
+            sensor sr-te-color {
+                server-name ppf;
+                export-name ppf;
+                resource /junos/services/segment-routing/traffic-engineering/ingress/usage/;
+            }
+            sensor sid {
+                server-name ppf;
+                export-name ppf;
+                resource /junos/services/segment-routing/sid/usage/;
+            }
+            sensor sr-te-tunnels {
+                server-name ppf;
+                export-name ppf;
+                resource /junos/services/segment-routing/traffic-engineering/tunnel/ingress/usage/;
+            }
+        }
+    }
+    protocols {
+        mpls {
+            sensor-based-stats;
+        }
+        source-packet-routing {
+            telemetry {
+                statistics;
+            }
+        }
+    }
+{% endif -%}
+
+{% if bgp_ls -%}
+    policy-options {
+        policy-statement TE {
+            term 1 {
+                from family traffic-engineering;
+                then accept;
+            }
+        }
+    }
+    routing-options {
+        autonomous-system {{bgp_ls.asn}};
+    }
+    protocols {
+        bgp {
+            group to_crpd {
+                type internal;
+                local-address {{bgp_ls.local_address}};
+                passive;
+                family traffic-engineering {
+                    unicast;
+                }
+                export TE;
+                allow 0.0.0.0/0;
+            }
+        }
+        mpls {
+            traffic-engineering {
+                database {
+                    import {
+                        policy TE;
+                    }
+                }
+            }
+        }
+    }
+{% endif -%}
+
+{% if rpm_probe -%}
+services {
+    rpm {
+        probe northstar-ifl {
+            {% for probe in rpm_probe -%}
+            test {{ probe }} {
+                probe-type icmp-ping-timestamp;
+                target address {{ rpm_probe[probe].dst }};
+                probe-count 11;
+                probe-interval 5;
+                test-interval 60;
+                source-address {{ rpm_probe[probe].src }};
+                moving-average-size 12;
+                traps test-completion;
+                hardware-timestamp;
+            }
+            {% endfor -%}
+        }
+    }
+}
+{% endif -%}
+
+{% if pcep -%}
+    protocols {
+        mpls {
+            lsp-external-controller pccd;
+        }
+        pcep {
+            pce pa1 {
+                local-address {{ pcep.local_address }};
+                destination-ipv4-address {{ pcep.server }};
+                destination-port 4189;
+                pce-type active stateful;
+                lsp-provisioning;
+            }
+        }
+    }
+{% endif -%}

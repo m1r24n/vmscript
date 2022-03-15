@@ -1,0 +1,61 @@
+lab_name: pa
+files:
+  vmx:
+    dir: vmx-21.4R1.12
+    re_file: junos-vmx-x86-64-21.4R1.12.qcow2
+    pfe_file: vFPC-20211115.img
+mgmt:
+  intf : lan100
+  ip : 10.1.100.1/24
+exist_bridge:
+  - lan100
+  - lan1
+login:
+  root_password: pass01
+  user: admin
+  password: pass01
+image_source : /home/debian/images
+image_destination : /home/debian/vm
+hugepages: yes
+fabric:
+  subnet: 10.100.2.0/24
+  topology:
+    - [ 0x3d, jkt, ge-0/0/1, bdg, ge-0/0/1 ]
+nodes:
+  jkt:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.81/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.1.1/32
+          iso: 49.0001.0101.0000.1001.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: jktge0
+        family:
+          inet: 10.100.11.1/24
+          iso: 
+        protocol:
+          isis:
+  bdg:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.82/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 10.100.1.2/32
+          iso: 49.0001.0101.0000.1002.00
+        protocol:
+          isis: passive
+      ge-0/0/0:
+        bridge: bdgge0
+        family:
+          inet: 10.100.12.1/24
+          iso: 
+        protocol:
+          isis:
+

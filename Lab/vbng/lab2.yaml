@@ -1,9 +1,9 @@
 lab_name: v1
 files:
   vmx:
-    dir: vmx-21.4R1.12
-    re_file: junos-vmx-x86-64-21.4R1.12.qcow2 
-    pfe_file: vFPC-20211115.img
+    dir: vmx-20.4R3.8
+    re_file: junos-vmx-x86-64-20.4R3.8.qcow2
+    pfe_file: vFPC-20210824.img
 mgmt:
    intf : lan100
    ip : 10.1.100.1/24
@@ -28,4 +28,19 @@ nodes:
       ge-0/0/1:
         bridge: access1
       ge-0/0/2:
+        bridge: access2
+  access:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.82/24 ]
+    interfaces:
+      ge-0/0/0:
         bridge: access1
+      ge-0/0/1:
+        bridge: access2
+      ge-0/0/2:
+        bridge: client1
+      ge-0/0/3:
+        bridge: client2
+      ge-0/0/4:
+        bridge: client3
