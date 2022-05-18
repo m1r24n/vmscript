@@ -1,5 +1,5 @@
 # Script to Deploy Junos VM on KVM, next-gen version
-release 0.2
+release 0.25
 
 ## Overview
 This script is used to deploy Junos VM (vMX, vQFX, vSRX, and vRR) on KVM, which is useful to create network topology for testing purposes.
