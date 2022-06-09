@@ -1,4 +1,4 @@
-lab_name: sdngw
+lab_name: lab6
 files:
   vmx:
     dir: vmx-22.1R1.10
@@ -15,25 +15,39 @@ login:
   root_password: pass01
   user: admin
   password: pass01
-#image_source : /home/debian/images
-#image_destination : /home/debian/vm
 image_source : /home/irzan/images
 image_destination : /home/irzan/vm
 nodes:
   r1:
     type: vmx
     mgmt: 
-      ip: [ 10.1.100.11/24 ]
+      ip: [ 10.1.100.81/24 ]
     interfaces:
       lo0:
         family:
           inet: 172.16.255.1/32
       ge-0/0/0:
-        bridge: lan1
+        bridge: r1lan0
         family:
-          inet: 10.1.1.81/24
+          inet: 172.16.10.1/24
       ge-0/0/1:
-        bridge: lan100
-        mtu: 9000
+        bridge: wan1
         family:
-          inet: 10.1.100.81/24
+          inet: 172.16.11.0/31
+  r2:
+    type: vmx
+    mgmt: 
+      ip: [ 10.1.100.82/24 ]
+    interfaces:
+      lo0:
+        family:
+          inet: 172.16.255.2/32
+      ge-0/0/0:
+        bridge: r2lan0
+        family:
+          inet: 172.16.20.1/24
+      ge-0/0/1:
+        bridge: wan1
+        family:
+          inet: 172.16.11.1/31
+

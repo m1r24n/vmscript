@@ -227,9 +227,9 @@ def create_vcp_vmx_xml(node, d1,re):
 	# cmd_head +="--ram 1024 --vcpu 1 --os-type linux --os-variant rhel7  --arch=x86_64 "
 	#cmd_head +="--ram 1024 --vcpu 1 "
 	if is_hugepages(d1):
-		cmd_head +="--memory=1024,hugepages=yes --memorybacking hugepages=yes --vcpu 1 "
+		cmd_head +="--memory=1024,hugepages=yes --memorybacking hugepages=yes --vcpu 1 --osinfo freebsd13.0 "
 	else:
-		cmd_head +="--memory=1024 --vcpu 1 "
+		cmd_head +="--memory=1024 --vcpu 1 --osinfo freebsd13.0 "
 	#cmd_head +="--sysinfo smbios,bios.vendor=Juniper,system.manufacturer=Juniper,system.version=0.1.0,system.product=vMX "
 	if 'mac' in d1['nodes'][node]['mgmt'].keys():
 		cmd_head +="--network bridge=" + mgmt+",model=virtio,mac=" + d1['nodes'][node]['mgmt']['mac'] + " " 
@@ -256,7 +256,8 @@ def create_vpfe_vmx_xml(node, d1):
 	mgmt = d1['mgmt']['intf']
 	#mgmt = mgmt_bridge(d1)
 	cmd_head="virt-install --name " + lab_name + "-vpfe-" + node 
-	cmd_head += " --disk " + dest_dir + "/" + lab_name + "/" + node + "/" + pfe_file +",device=disk,bus=ide,format=qcow2 "
+	# cmd_head += " --disk " + dest_dir + "/" + lab_name + "/" + node + "/" + pfe_file +",device=disk,bus=ide,format=qcow2 "
+	cmd_head += " --disk " + dest_dir + "/" + lab_name + "/" + node + "/" + pfe_file +",device=disk,format=qcow2 "
 	# cmd_head +="--ram 3072 --vcpu 4 --os-type linux --os-variant rhel7  --arch=x86_64 "
 	#cmd_head +="--ram 3072 --vcpu 4 "
 	if is_hugepages(d1):
@@ -265,7 +266,8 @@ def create_vpfe_vmx_xml(node, d1):
 	else:
 		#cmd_head +="--memory=3072 --vcpu 3 "
 		cmd_head +="--memory=2048 --vcpu 3 "
-	cmd_head +="--cpu host-passthrough "
+	# cmd_head +="--cpu host-passthrough --osinfo linux2020 "
+	cmd_head +="--osinfo linux2020 "
 	cmd_head +="--network bridge=" + mgmt+",model=virtio "
 	# cmd_head +="--network bridge=" + lab_name+"Int" + node +",model=virtio "
 	cmd_head +="--network bridge=Int" + node +",model=virtio "
