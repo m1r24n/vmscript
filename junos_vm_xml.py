@@ -101,7 +101,7 @@ def create_vpfe_vqfx_xml(node,d1):
 	cmd_head +="--network bridge=" + mgmt+",model=e1000 "
 	# cmd_head +="--network bridge=" + lab_name +"Int" + node + ",model=e1000 " 
 	cmd_head +="--network bridge=Int" + node + ",model=e1000 " 
-	cmd_tail="--console pty,target_type=serial --noautoconsole --hvm --accelerate --graphics vnc,password=" + VNC_PASSWORD + ",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
+	cmd_tail="--osinfo linux2020 --console pty,target_type=serial --noautoconsole --hvm --accelerate --graphics vnc,password=" + VNC_PASSWORD + ",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
 	cmd1 = cmd_head + cmd_tail
 	# print("command ", cmd1)
 	xml=virtinstall2xml(cmd1,mgmt)
@@ -135,7 +135,7 @@ def create_vcp_vqfx_xml(node,d1):
 	#cmd_head +="--network bridge=" + lab_name +"Int" + node +",model=e1000 " 
 	cmd_head +="--network bridge=Int" + node + ",model=e1000 " 
 	cmd_head +="--network bridge=Int" + node +",model=e1000 " 
-	cmd_tail="--console pty,target_type=serial --noautoconsole --hvm --accelerate --graphics vnc,password=" +VNC_PASSWORD +",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
+	cmd_tail="--osinfo freebsd13.0 --console pty,target_type=serial --noautoconsole --hvm --accelerate --graphics vnc,password=" +VNC_PASSWORD +",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
 	cmd1 = cmd_head + intfcmd(node,d1) + cmd_tail
 	# print("command ", cmd1)
 	xml=virtinstall2xml(cmd1,mgmt)
@@ -165,7 +165,7 @@ def create_vsrx_xml(node,d1):
 		cmd_head +="--network bridge=" + mgmt+",model=e1000,mac=" + d1['nodes'][node]['mgmt']['mac'] + " " 
 	else:
 		cmd_head +="--network bridge=" + mgmt+",model=e1000 " 
-	cmd_tail="--console pty,target_type=serial --noautoconsole --hvm --accelerate --graphics vnc,password=" +VNC_PASSWORD +",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
+	cmd_tail="--osinfo freebsd13.0 --console pty,target_type=serial --noautoconsole --hvm --accelerate --graphics vnc,password=" +VNC_PASSWORD +",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
 	cmd1 = cmd_head + intfcmd(node,d1) + cmd_tail
 	# print("command ", cmd1)
 	xml=virtinstall2xml(cmd1,mgmt)
@@ -192,7 +192,7 @@ def create_vmx_xml(node, d1):
 		cmd_head +="--network bridge=" + mgmt+",model=virtio,mac=" + d1['nodes'][node]['mgmt']['mac'] + " " 
 	else:
 		cmd_head +="--network bridge=" + mgmt+",model=virtio " 
-	cmd_tail="--console pty,target_type=serial --noautoconsole  --graphics vnc,password=" +VNC_PASSWORD +",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
+	cmd_tail="--osinfo linux2020 --console pty,target_type=serial --noautoconsole  --graphics vnc,password=" +VNC_PASSWORD +",listen=0.0.0.0 --virt-type=kvm --boot hd --print-xml "
 	cmd_list=""
 	cmd1 = cmd_head + cmd_list + cmd_tail
 	xml=virtinstall2xml(cmd1,mgmt)
