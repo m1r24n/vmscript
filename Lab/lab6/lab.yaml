@@ -1,7 +1,7 @@
 lab_name: lab6
 files:
   vmx:
-    dir: vmx-22.1R1.10
+    dir: vmx
     re_file: junos-vmx-x86-64-22.1R1.10.qcow2
     pfe_file: vFPC-20220223.img
 mgmt:
@@ -15,8 +15,8 @@ login:
   root_password: pass01
   user: admin
   password: pass01
-image_source : /home/irzan/images
-image_destination : /home/irzan/vm
+image_source : /disk2/images
+image_destination : /disk2/vm
 nodes:
   r1:
     type: vmx
@@ -32,8 +32,8 @@ nodes:
           inet: 172.16.10.1/24
       ge-0/0/1:
         bridge: wan1
-        family:
-          inet: 172.16.11.0/31
+      ge-0/0/2:
+        bridge: wan2
   r2:
     type: vmx
     mgmt: 
@@ -48,6 +48,6 @@ nodes:
           inet: 172.16.20.1/24
       ge-0/0/1:
         bridge: wan1
-        family:
-          inet: 172.16.11.1/31
+      ge-0/0/2:
+        bridge: wan2
 
